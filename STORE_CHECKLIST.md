@@ -1,4 +1,4 @@
-# Cartridge Store release checklist — 1.2.0
+# Cartridge Store release checklist — 1.2.3
 
 - [x] Original game identity: `Spiriti! Napoli '97`.
 - [x] Colophon explicitly identifies the cartridge as an unofficial tribute game.
@@ -12,8 +12,9 @@
 - [x] Strict host syntax and JSON checks pass.
 - [x] Portable runtime uses 26,320 of 32,768 available bytes.
 - [x] Build with the current `development-c6` PRG32 toolchain.
-- [x] Confirm final two-architecture Store bundle size < 128 KiB via the official packer (113.0 KiB).
-- [ ] Replace the deterministic runtime-asset preview with a real QEMU capture for final Store publication if Store policy requires an execution capture.
+- [x] Confirm final two-architecture Store bundle size < 128 KiB via the official packer (113.1 KiB).
+- [x] Validate the QEMU preview: 30.00 seconds, 320x200 H.264/30 fps, 22,050 Hz mono AAC with audible soundtrack.
+- [x] Replace the deterministic asset mockup with a real QEMU screenshot and 30-second audiovisual capture.
 - [x] QEMU firmware boot, cartridge autoload and injected-control smoke test.
 - [ ] Smoke-test all six district tile scenes on QEMU.
 - [ ] Smoke-test physical ESP32-C6 frame rate while the boss + beam are active.

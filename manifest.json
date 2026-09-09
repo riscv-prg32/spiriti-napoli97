@@ -4,6 +4,8 @@
   "title": "Spiriti! Napoli '97",
   "version": "1.2.3",
   "summary": "Paranormal arcade action in late-1990s Naples.",
+  "license": "MIT",
+  "repository": "https://github.com/riscv-prg32/spiriti-napoli97",
   "architectures": [
     {
       "id": "esp32c6",

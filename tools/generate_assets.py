@@ -112,7 +112,15 @@ def indexed_palette_rgba(im: Image.Image, colors=256):
     inds=inds.copy(); inds[alpha==0]=ti
     pal565=[rgb565(c) for c in pal_rgb]
     while len(pal565)<colors: pal565.append(0)
-    return inds,pal565,ti,pal_rgb
+    # The cartridge's shared 4-bpp descriptor reserves index zero for
+    # transparency.  Swap the quantizer's marker entry into that slot so PNG
+    # previews and the real PRG32 renderer obey the same palette contract.
+    if ti != 0:
+        zero=inds==0; transparent=inds==ti
+        inds[zero]=ti; inds[transparent]=0
+        pal565[0],pal565[ti]=pal565[ti],pal565[0]
+        pal_rgb[0],pal_rgb[ti]=pal_rgb[ti],pal_rgb[0]
+    return inds,pal565,0,pal_rgb
 
 def pack4(indices: np.ndarray):
     h,w=indices.shape; out=[]
@@ -261,31 +269,9 @@ def main():
         xx=(i%cols)*tw; yy=(i//cols)*(th+22); ss.paste(im,(xx,yy)); dd.text((xx+4,yy+146),name,fill=(255,255,255))
     ss.save(SCENE_PREVIEW)
 
-    # Store/gameplay preview composed exclusively from generated runtime art.
-    # It is a deterministic asset preview, not a claimed QEMU screenshot.
-    scene=dict(scene_previews)["sn_centro_scene"].copy()
-    shot=Image.new("RGB",(320,200),(4,10,22)); shot.paste(scene,(0,0))
-    # Extend the bottom scene strip where the capture ground/overlay normally sits.
-    shot.paste(scene.crop((0,128,320,144)).resize((320,24),Image.Resampling.NEAREST),(0,144))
-    sp=dict(sprite_previews)
-    def paste_rgba(key,xy):
-        im=sp[key].convert("RGBA"); shot.paste(im,xy,im)
-    paste_rgba("sn_hunter",(18,105)); paste_rgba("sn_ghost0",(188,50)); paste_rgba("sn_trap",(148,150)); paste_rgba("sn_lamp",(2,105))
-    d=ImageDraw.Draw(shot)
-    # Actual game beam style.
-    for i in range(19):
-        x=47+(208-47)*i//18; y=126+(70-126)*i//18; wob=((i*7)&3)-1
-        d.rectangle((x,y+wob,x+3,y+wob+1),fill=(0,220,255) if i&1 else (255,120,20))
-        if i%5==0: d.point((x+1,y+wob-2),fill=(255,255,255))
-    d.rectangle((0,0,319,21),fill=(4,10,22)); d.text((8,6),"CENTRO STORICO",fill=(255,220,60))
-    d.rectangle((0,168,319,199),fill=(4,10,22)); d.text((7,171),"A RAGGIO  SIN/DES TRAPPOLA",fill=(255,240,205))
-    d.text((7,187),"CATTURA 58     CALORE 34",fill=(190,220,230))
-    shot.save(ROOT/"screenshot.png")
-
     print(f"wrote {OUT} ({OUT.stat().st_size} bytes)")
     print(f"wrote {PREVIEW}")
     print(f"wrote {SCENE_PREVIEW}")
-    print(f"wrote {ROOT/'screenshot.png'}")
 
 if __name__=="__main__":
     main()

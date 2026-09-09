@@ -8,7 +8,16 @@
   "developer": {
     "name": "PRG32 Tribute Cartridge Contributors"
   },
+  "authors": [
+    "PRG32 Tribute Cartridge Contributors"
+  ],
   "license": "MIT",
+  "language": "it",
+  "genre": "arcade-action",
+  "players": {
+    "minimum": 1,
+    "maximum": 1
+  },
   "tags": [
     "game",
     "arcade",
@@ -32,5 +41,13 @@
     ]
   },
   "repository": "https://github.com/riscv-prg32/spiriti-napoli97",
-  "organization": "https://github.com/orgs/riscv-prg32/repositories"
+  "organization": "https://github.com/orgs/riscv-prg32/repositories",
+  "media": {
+    "preview": "preview.mp4",
+    "duration_seconds": 30,
+    "video": "H.264 320x200",
+    "audio": "AAC from PRG32 QEMU UART PCM"
+  },
+  "content_rating": "Everyone",
+  "content_notice": "Unofficial tribute; no copied franchise logo, soundtrack recording, dialogue, sprites or game data."
 }

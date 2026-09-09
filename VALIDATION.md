@@ -1,4 +1,4 @@
-# Validation status — 1.2.0
+# Validation status — 1.2.3
 
 ## Completed in this package
 
@@ -6,7 +6,7 @@
 - JSON validation for `audio.json`, `metadata.json`, `manifest.json`, and `colophon.json`.
 - Deterministic regeneration of `assets.h` from checked-in `assets-src/` PNGs.
 - Official portable cartridge build: 26,216 bytes of code and 26,320 bytes of runtime memory, within the 32 KiB runtime slot.
-- Complete two-architecture Store bundle: approximately 113.0 KiB, within the 128 KiB distribution ceiling.
+- Complete two-architecture Store bundle: 115,765 bytes (113.1 KiB), within the 128 KiB distribution ceiling.
 - 4-bpp indexed generation for the Fiat, hunter, six ghosts, boss and repeated props.
 - Coherent 24-colour tile-engine generation for the Naples overview map and five district background families.
 - Portable-code review: no hard-coded firmware addresses and no global/static sprite descriptor containing pointers to other cartridge objects.
@@ -18,6 +18,8 @@
 The official compiler and packer produced both `esp32c6` and `qemu` packages, inspected their metadata, and packed the Store bundle. QEMU smoke-test results are recorded below. Physical ESP32-C6 hardware validation remains required before publication.
 
 The QEMU firmware booted, initialized its 320x240 framebuffer and audio stream, and autoloaded the cartridge from `cart0`. The runtime reported the expected 26,216-byte code, 26,320-byte memory and 2,904-byte audio sizes. Injected title/game controls produced no panic or runtime fault during the smoke window.
+
+The publishing preview was captured from real QEMU execution: exactly 30.00 seconds, 320x200 H.264 at 30 fps, with a 22,050 Hz mono AAC soundtrack sourced from PRG32's UART PCM stream. Audio verification measured -28.4 dB mean and -16.1 dB peak. Representative frames cover the dispatch map, driving and spirit-capture/beam sequences. The embedded Store screenshot is an indexed PNG extracted from that recording rather than a synthetic mockup.
 
 From a current `development-c6` checkout:
 

@@ -7,7 +7,9 @@
   "developer": {
     "name": "PRG32 Tribute Cartridge Contributors"
   },
-  "authors": [],
+  "authors": [
+    "PRG32 Tribute Cartridge Contributors"
+  ],
   "license": "MIT",
   "acknowledgements": [
     "A tribute to the paranormal-comedy arcade tradition popularized by Ghostbusters and 1980s home-computer games",
