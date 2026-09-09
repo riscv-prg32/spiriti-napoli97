@@ -10,9 +10,9 @@
 - [x] Compact 4-bpp indexed sprites and props with transparency.
 - [x] SID-like procedural music/SFX with stereo pan and mono fallback.
 - [x] Strict host syntax and JSON checks pass.
-- [x] Portable runtime uses 31,716 of 32,768 available bytes.
+- [x] Portable runtime uses 26,320 of 32,768 available bytes.
 - [x] Build with the current `development-c6` PRG32 toolchain.
-- [x] Confirm final two-architecture Store bundle size < 128 KiB via the official packer (116.7 KiB).
+- [x] Confirm final two-architecture Store bundle size < 128 KiB via the official packer (113.0 KiB).
 - [ ] Replace the deterministic runtime-asset preview with a real QEMU capture for final Store publication if Store policy requires an execution capture.
 - [x] QEMU firmware boot, cartridge autoload and injected-control smoke test.
 - [ ] Smoke-test all six district tile scenes on QEMU.

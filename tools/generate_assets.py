@@ -11,15 +11,9 @@ cartridges do not depend on data relocations. game.c builds descriptors on stack
 """
 from __future__ import annotations
 from pathlib import Path
-from collections import Counter
 import math
 import numpy as np
 from PIL import Image, ImageDraw
-
-try:
-    from sklearn.cluster import MiniBatchKMeans
-except Exception:
-    MiniBatchKMeans = None
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "assets-src"
@@ -120,20 +114,6 @@ def indexed_palette_rgba(im: Image.Image, colors=256):
     while len(pal565)<colors: pal565.append(0)
     return inds,pal565,ti,pal_rgb
 
-def pack_bitplanes(indices: np.ndarray, bits=8):
-    h,w=indices.shape
-    row_bytes=(w+7)//8
-    out=[]
-    for plane in range(bits):
-        for y in range(h):
-            for bx in range(row_bytes):
-                b=0
-                for k in range(8):
-                    x=bx*8+k
-                    if x<w and ((int(indices[y,x])>>plane)&1): b |= 1<<(7-k)
-                out.append(b)
-    return out
-
 def pack4(indices: np.ndarray):
     h,w=indices.shape; out=[]
     for y in range(h):
@@ -168,64 +148,24 @@ def props():
     return p
 
 # --- playfield tile compression -------------------------------------------
-def local_two_color_tiles(im: Image.Image):
-    """Return 720 locally-two-colour 8x8 RGB tiles and their bit encodings."""
-    im=im.convert("RGB").resize((320,144),Image.Resampling.NEAREST)
-    # 24-color source palette retains the strong design-sheet lighting.
-    q=im.quantize(colors=24,method=Image.Quantize.MEDIANCUT,dither=Image.Dither.NONE).convert("RGB")
-    tiles=[]; defs=[]
-    for ty in range(18):
-        for tx in range(40):
-            arr=np.asarray(q.crop((tx*8,ty*8,tx*8+8,ty*8+8)),dtype=np.uint8)
-            cnt=Counter(map(tuple,arr.reshape(-1,3)))
-            cols=[c for c,_ in cnt.most_common(2)]
-            if len(cols)==1: cols.append(cols[0])
-            bg=np.asarray(cols[0],dtype=np.int16); fg=np.asarray(cols[1],dtype=np.int16)
-            pix=arr.astype(np.int16)
-            d0=np.sum((pix-bg)**2,axis=2); d1=np.sum((pix-fg)**2,axis=2)
-            mask=d1<d0
-            recon=np.where(mask[:,:,None],fg,bg).astype(np.uint8)
-            bits=[]
-            for y in range(8):
-                b=0
-                for x in range(8):
-                    if mask[y,x]: b|=1<<(7-x)
-                bits.append(b)
-            tiles.append(recon.reshape(-1).astype(np.float32))
-            defs.append((tuple(bits),tuple(map(int,fg)),tuple(map(int,bg))))
-    return np.stack(tiles),defs
-
 def compress_scene(im: Image.Image, max_tiles=176, seed=7):
-    vecs,defs=local_two_color_tiles(im)
-    n=len(vecs); k=min(max_tiles,n)
-    if MiniBatchKMeans is None:
-        # deterministic feature bucketing fallback; generated header is checked in,
-        # so this path is only for optional regeneration without scikit-learn.
-        sig_to_id={}; medoids=[]; labels=[]
-        for i,d in enumerate(defs):
-            bits,fg,bg=d
-            sig=(bits[0]&0xf0,bits[3],bits[7]&0x0f,fg[0]//64,fg[1]//64,fg[2]//64,bg[0]//64,bg[1]//64,bg[2]//64)
-            if sig not in sig_to_id and len(medoids)<k:
-                sig_to_id[sig]=len(medoids); medoids.append(i)
-            labels.append(sig_to_id.get(sig,0))
-    else:
-        km=MiniBatchKMeans(n_clusters=k,random_state=seed,batch_size=256,n_init=3,max_iter=80,reassignment_ratio=0.01)
-        labels=km.fit_predict(vecs)
-        centers=km.cluster_centers_
-        medoids=[]
-        for ci in range(k):
-            idx=np.where(labels==ci)[0]
-            if len(idx)==0: medoids.append(0); continue
-            sub=vecs[idx]; d=np.sum((sub-centers[ci])**2,axis=1)
-            medoids.append(int(idx[int(np.argmin(d))]))
-        # remap through nearest actual medoid for consistent map rendering
-        med=np.stack([vecs[i] for i in medoids])
-        # squared distance via ||a||+||b||-2ab
-        aa=np.sum(vecs*vecs,axis=1)[:,None]; bb=np.sum(med*med,axis=1)[None,:]
-        dd=aa+bb-2.0*(vecs@med.T)
-        labels=np.argmin(dd,axis=1).astype(np.uint8)
-    tile_defs=[defs[i] for i in medoids]
-    return tile_defs,np.asarray(labels,dtype=np.uint8)
+    """Create coherent chunky-pixel scenery with one colour per 8x8 tile.
+
+    Full-tile clustering produced unrelated high-frequency patterns at tile
+    boundaries.  Sampling the art to the native 40x18 tile grid retains its
+    composition and lighting while giving moving sprites a quiet backdrop.
+    """
+    del seed
+    colors=min(max_tiles,24)
+    low=im.convert("RGB").resize((40,18),Image.Resampling.BOX)
+    q=low.quantize(colors=colors,method=Image.Quantize.MEDIANCUT,dither=Image.Dither.NONE)
+    used=sorted(set(int(v) for v in np.asarray(q).flat))
+    pal=q.getpalette()
+    palette=[tuple(pal[i*3:i*3+3]) for i in used]
+    remap={old:new for new,old in enumerate(used)}
+    labels=np.asarray([remap[int(v)] for v in np.asarray(q).flat],dtype=np.uint8)
+    tile_defs=[((0,)*8,c,c) for c in palette]
+    return tile_defs,labels
 
 def reconstruct_scene(tile_defs,labels):
     out=Image.new("RGB",(320,144))
@@ -238,18 +178,18 @@ def reconstruct_scene(tile_defs,labels):
 
 # --- source definitions ----------------------------------------------------
 SPRITES=[
-    ("sn_fiat", "fiat.png", (72,36)),
-    ("sn_hunter", "hunter.png", (32,48)),
-    ("sn_ghost0", "ghost0.png", (40,40)),
-    ("sn_ghost1", "ghost1.png", (40,40)),
-    ("sn_ghost2", "ghost2.png", (40,40)),
-    ("sn_ghost3", "ghost3.png", (40,40)),
-    ("sn_ghost4", "ghost4.png", (40,40)),
-    ("sn_ghost5", "ghost5.png", (40,40)),
-    ("sn_boss", "boss.png", (96,72)),
+    ("sn_fiat", "fiat.png", (72,36), (0,0,92,76)),
+    ("sn_hunter", "hunter.png", (32,48), (0,0,56,84)),
+    ("sn_ghost0", "ghost0.png", (40,40), (0,0,72,70)),
+    ("sn_ghost1", "ghost1.png", (40,40), (0,0,69,70)),
+    ("sn_ghost2", "ghost2.png", (40,40), (0,0,71,70)),
+    ("sn_ghost3", "ghost3.png", (40,40), (0,0,78,70)),
+    ("sn_ghost4", "ghost4.png", (40,40), (0,0,72,70)),
+    ("sn_ghost5", "ghost5.png", (40,40), (0,0,71,70)),
+    ("sn_boss", "boss.png", (96,72), None),
 ]
 SCENES=[
-    ("sn_map_scene","map.png",(0,0,421,353),112),
+    ("sn_map_scene","map.png",(0,28,421,318),112),
     ("sn_centro_scene","centro.png",None,96),
     ("sn_mergellina_scene","mergellina.png",None,96),
     ("sn_porto_scene","porto.png",None,96),
@@ -262,8 +202,10 @@ def main():
     h=["#ifndef SPIRITI_NAPOLI97_ASSETS_H","#define SPIRITI_NAPOLI97_ASSETS_H","#include <stdint.h>",
        "/* Generated assets: sprites use compact 4-bpp data; scenes use PRG32 8x8 tiles. */"]
     sprite_previews=[]
-    for symbol,filename,size in SPRITES:
-        im=trim_and_fit(Image.open(SRC/filename),size)
+    for symbol,filename,size,source_crop in SPRITES:
+        source=Image.open(SRC/filename)
+        if source_crop: source=source.crop(source_crop)
+        im=trim_and_fit(source,size)
         inds,pal,ti,palrgb=indexed_palette_rgba(im,16)
         pixels=pack4(inds)
         h.append(f"#define {symbol.upper()}_W {size[0]}")

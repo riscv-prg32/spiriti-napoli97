@@ -5,10 +5,10 @@
 - Strict host C syntax check (`clang -std=c11 -Wall -Wextra -Werror`) against the cartridge API stub.
 - JSON validation for `audio.json`, `metadata.json`, `manifest.json`, and `colophon.json`.
 - Deterministic regeneration of `assets.h` from checked-in `assets-src/` PNGs.
-- Official portable cartridge build: 31,612 bytes of code and 31,716 bytes of runtime memory, within the 32 KiB runtime slot.
-- Complete two-architecture Store bundle: approximately 116.8 KiB, within the 128 KiB distribution ceiling.
+- Official portable cartridge build: 26,216 bytes of code and 26,320 bytes of runtime memory, within the 32 KiB runtime slot.
+- Complete two-architecture Store bundle: approximately 113.0 KiB, within the 128 KiB distribution ceiling.
 - 4-bpp indexed generation for the Fiat, hunter, six ghosts, boss and repeated props.
-- Tile-engine generation for the Naples overview map and five district background families.
+- Coherent 24-colour tile-engine generation for the Naples overview map and five district background families.
 - Portable-code review: no hard-coded firmware addresses and no global/static sprite descriptor containing pointers to other cartridge objects.
 - Metadata declares `esp32c6` and `qemu` Store architectures.
 - Music/SFX are procedural SID-like descriptors; no copyrighted recording or Ghostbusters soundtrack melody is bundled.
@@ -17,7 +17,7 @@
 
 The official compiler and packer produced both `esp32c6` and `qemu` packages, inspected their metadata, and packed the Store bundle. QEMU smoke-test results are recorded below. Physical ESP32-C6 hardware validation remains required before publication.
 
-The QEMU firmware booted, initialized its 320x240 framebuffer and audio stream, and autoloaded the cartridge from `cart0`. The runtime reported the expected 31,612-byte code, 31,716-byte memory and 2,904-byte audio sizes. Injected title/game controls produced no panic or runtime fault during the smoke window.
+The QEMU firmware booted, initialized its 320x240 framebuffer and audio stream, and autoloaded the cartridge from `cart0`. The runtime reported the expected 26,216-byte code, 26,320-byte memory and 2,904-byte audio sizes. Injected title/game controls produced no panic or runtime fault during the smoke window.
 
 From a current `development-c6` checkout:
 

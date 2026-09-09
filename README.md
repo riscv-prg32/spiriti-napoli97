@@ -34,11 +34,11 @@ The generated graphics and executable fit PRG32's strict 32 KiB runtime slot. Th
 The checked-in `assets-src/` directory contains the cropped original project artwork used to generate the cartridge graphics. `assets.h` is already generated and is sufficient for normal builds. To regenerate it and the previews:
 
 ```sh
-python3 -m pip install pillow numpy scikit-learn
+python3 -m pip install pillow numpy
 ./tools/generate_assets.py
 ```
 
-The generator converts hero/vehicle/enemy art to packed 4-bpp data and compresses background artwork into scene-local two-colour 8x8 tile dictionaries compatible with PRG32's tile API. Each scene uses at most 112 tile IDs, leaving high IDs available for runtime road/cobblestone overlays.
+The generator converts hero/vehicle/enemy art to packed 4-bpp data and reduces background artwork to coherent scene-local 24-colour 8x8 tile dictionaries compatible with PRG32's tile API. The deliberately chunky backgrounds keep moving sprites readable, avoid noisy tile-remapping artifacts, and leave high IDs available for runtime road/cobblestone overlays.
 
 ## Build
 
