@@ -1,0 +1,36 @@
+{
+  "abi": "prg32-metadata-1.0",
+  "id": "org.riscv-prg32.spiriti-napoli97",
+  "title": "Spiriti! Napoli '97",
+  "version": "1.2.3",
+  "summary": "Tile-engine Naples paranormal arcade tribute with compact indexed sprites.",
+  "description": "Drive a highly recognizable classic Fiat 500-style response car across a tile-rendered Naples night, answer paranormal calls, dodge ectoplasm, and trap spirits. Runtime graphics combine PRG32 64x32 playfields and 8x8 tiles with compact 4-bpp indexed sprites for the hunter, response car, spirits, Vesuvius boss and props. The audiovisual direction evokes the 1984 paranormal-comedy arcade era through original tribute artwork, capture/siren motifs, call-and-response synth writing and SID-like stereo synthesis, without reproducing protected Ghostbusters logo art, soundtrack melody/recordings, dialogue or original game assets. Unofficial tribute game; unaffiliated with the rights holders.",
+  "developer": {
+    "name": "PRG32 Tribute Cartridge Contributors"
+  },
+  "license": "MIT",
+  "tags": [
+    "game",
+    "arcade",
+    "naples",
+    "1990s",
+    "indexed-graphics",
+    "sid-like",
+    "stereo",
+    "tribute",
+    "tile-engine",
+    "4bpp"
+  ],
+  "created_at": "2026-09-09T00:00:00Z",
+  "updated_at": "2026-09-09T00:00:00Z",
+  "runtime": {
+    "platform": "PRG32",
+    "isa": "RV32IMAC",
+    "architectures": [
+      "esp32c6",
+      "qemu"
+    ]
+  },
+  "repository": "https://github.com/riscv-prg32/spiriti-napoli97",
+  "organization": "https://github.com/orgs/riscv-prg32/repositories"
+}

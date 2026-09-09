@@ -1,0 +1,21 @@
+# Cartridge Store release checklist — 1.2.0
+
+- [x] Original game identity: `Spiriti! Napoli '97`.
+- [x] Colophon explicitly identifies the cartridge as an unofficial tribute game.
+- [x] Original/project-created title treatment, pixel art source, code, text, tracker composition and SFX; no copied Ghostbusters soundtrack recording/game data.
+- [x] Portable ABI build script uses `--portable`.
+- [x] Store metadata entries for `esp32c6` and `qemu`.
+- [x] Metadata, manifest, colophon, icon and 320x200 runtime-asset preview included.
+- [x] PRG32 tile/playfield map and district backgrounds.
+- [x] Compact 4-bpp indexed sprites and props with transparency.
+- [x] SID-like procedural music/SFX with stereo pan and mono fallback.
+- [x] Strict host syntax and JSON checks pass.
+- [x] Portable runtime uses 31,716 of 32,768 available bytes.
+- [x] Build with the current `development-c6` PRG32 toolchain.
+- [x] Confirm final two-architecture Store bundle size < 128 KiB via the official packer (116.7 KiB).
+- [ ] Replace the deterministic runtime-asset preview with a real QEMU capture for final Store publication if Store policy requires an execution capture.
+- [x] QEMU firmware boot, cartridge autoload and injected-control smoke test.
+- [ ] Smoke-test all six district tile scenes on QEMU.
+- [ ] Smoke-test physical ESP32-C6 frame rate while the boss + beam are active.
+- [ ] Verify mono and stereo I2S paths plus scoreboard.
+- [x] Run repository-level `git diff --check` and host validation.

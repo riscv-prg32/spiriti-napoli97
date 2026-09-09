@@ -51,5 +51,10 @@ Module.symvers
 Mkfile.old
 dkms.conf
 
+# Cartridge build outputs
+build/
+dist/
+.DS_Store
+
 # debug information files
 *.dwo

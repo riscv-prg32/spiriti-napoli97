@@ -1,0 +1,22 @@
+{
+  "abi": "prg32-bundle-1.0",
+  "id": "org.riscv-prg32.spiriti-napoli97",
+  "title": "Spiriti! Napoli '97",
+  "version": "1.2.3",
+  "summary": "Paranormal arcade action in late-1990s Naples.",
+  "architectures": [
+    {
+      "id": "esp32c6",
+      "file": "spiriti-napoli97-esp32c6.prg32"
+    },
+    {
+      "id": "qemu",
+      "file": "spiriti-napoli97-qemu.prg32"
+    }
+  ],
+  "assets": {
+    "icon": "icon.png",
+    "screenshot": "screenshot.png",
+    "colophon": "colophon.json"
+  }
+}
