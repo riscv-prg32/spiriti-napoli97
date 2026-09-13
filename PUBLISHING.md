@@ -1,6 +1,6 @@
 # Cartridge Store publishing
 
-`Spiriti! Napoli '97` is prepared for the PRG32 Cartridge Store on the `development-c6` ABI. The release contains portable packages for physical ESP32-C6 and the ESP32-C3 QEMU runtime, embedded Store metadata, a 256x256 icon, a 320x200 gameplay screenshot, a colophon and a real 30-second audiovisual QEMU preview.
+`Spiriti! Napoli '97` is prepared for the PRG32 Cartridge Store on the `main` ABI. The release contains portable packages for physical ESP32-C6 and the ESP32-C3 QEMU runtime, embedded Store metadata, a 256x256 icon, a 320x200 gameplay screenshot, a colophon and a real 30-second audiovisual QEMU preview.
 
 ## Release artifacts
 

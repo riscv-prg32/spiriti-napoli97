@@ -13,7 +13,7 @@
 - Metadata declares `esp32c6` and `qemu` Store architectures.
 - Music/SFX are procedural SID-like descriptors; no copyrighted recording or Ghostbusters soundtrack melody is bundled.
 
-## Completed with PRG32 `development-c6`
+## Historical validation with PRG32 `development-c6`
 
 The official compiler and packer produced both `esp32c6` and `qemu` packages, inspected their metadata, and packed the Store bundle. QEMU smoke-test results are recorded below. Physical ESP32-C6 hardware validation remains required before publication.
 
@@ -21,7 +21,7 @@ The QEMU firmware booted, initialized its 320x240 framebuffer and audio stream, 
 
 The publishing preview was captured from real QEMU execution: exactly 30.00 seconds, 320x200 H.264 at 30 fps, with a 22,050 Hz mono AAC soundtrack sourced from PRG32's UART PCM stream. Audio verification measured -28.4 dB mean and -16.1 dB peak. Representative frames cover the dispatch map, driving and spirit-capture/beam sequences. The embedded Store screenshot is an indexed PNG extracted from that recording rather than a synthetic mockup.
 
-From a current `development-c6` checkout:
+From a current PRG32 `main` checkout:
 
 ```sh
 source "$HOME/esp-idf/export.sh"
@@ -43,3 +43,11 @@ python3 -m prg32 qemu run
 ```
 
 On physical ESP32-C6, exercise title -> tile map -> driving -> capture -> result -> map, all six districts, the boss, scoreboard, mono/stereo audio fallback, abort/restart, and prolonged beam/drive rendering.
+
+## Current `main` build compatibility
+
+`build.sh` now compiles separate portable payloads with explicit `--architecture`
+values for ESP32-C6 and QEMU. `test.sh` checks the source against the public
+headers from the same PRG32 checkout used for packaging. The measurements
+above record the earlier `development-c6` validation and are not guarantees
+for later PRG32 revisions.

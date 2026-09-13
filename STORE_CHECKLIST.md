@@ -11,7 +11,7 @@
 - [x] SID-like procedural music/SFX with stereo pan and mono fallback.
 - [x] Strict host syntax and JSON checks pass.
 - [x] Portable runtime uses 26,320 of 32,768 available bytes.
-- [x] Build with the current `development-c6` PRG32 toolchain.
+- [x] Build with the current `main` PRG32 toolchain.
 - [x] Confirm final two-architecture Store bundle size < 128 KiB via the official packer (113.1 KiB).
 - [x] Validate the QEMU preview: 30.00 seconds, 320x200 H.264/30 fps, 22,050 Hz mono AAC with audible soundtrack.
 - [x] Replace the deterministic asset mockup with a real QEMU screenshot and 30-second audiovisual capture.
