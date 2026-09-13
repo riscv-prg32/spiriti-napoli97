@@ -1,6 +1,6 @@
 # Spiriti! Napoli '97 — PRG32 cartridge
 
-An unofficial **Ghostbusters-inspired tribute game** for PRG32 `development-c6`, intended for publication under the `riscv-prg32` GitHub organization. The game is set in Naples in 1997 and uses original cartridge code, graphics and SID-like music. Its visual/audio language deliberately evokes the 1984 paranormal-comedy arcade tradition without shipping the protected Ghostbusters logo, soundtrack melody/recording, dialogue, film/game sprites, or other copied franchise assets.
+An unofficial **Ghostbusters-inspired tribute game** for PRG32 `main`, intended for publication under the `riscv-prg32` GitHub organization. The game is set in Naples in 1997 and uses original cartridge code, graphics and SID-like music. Its visual/audio language deliberately evokes the 1984 paranormal-comedy arcade tradition without shipping the protected Ghostbusters logo, soundtrack melody/recording, dialogue, film/game sprites, or other copied franchise assets.
 
 [Download the 30-second MP4 captured from the actual QEMU playfield and UART soundtrack](preview.mp4).
 
@@ -44,7 +44,7 @@ The generator converts hero/vehicle/enemy art to packed 4-bpp data and reduces b
 
 ## Build
 
-Use a checkout of `riscv-prg32/PRG32` on branch `development-c6`:
+Use a checkout of `riscv-prg32/PRG32` on branch `main`:
 
 ```sh
 export PRG32_REPO=/path/to/PRG32

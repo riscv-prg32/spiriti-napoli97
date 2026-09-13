@@ -1,19 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-ROOT="${PRG32_REPO:-$(cd "$HERE/../.." 2>/dev/null && pwd || true)}"
+ROOT="${PRG32_REPO:-"$HERE/../PRG32"}"
 if [ ! -f "$ROOT/tools/prg32audio_pack.py" ]; then
-  echo "Set PRG32_REPO to a PRG32 development-c6 checkout." >&2; exit 2
+  echo "Set PRG32_REPO to a current PRG32 main checkout." >&2; exit 2
 fi
 BUILD="$HERE/build"; DIST="$HERE/dist"; STORE="$DIST/store"
 mkdir -p "$BUILD" "$STORE"
 cd "$ROOT"
 python3 tools/prg32audio_pack.py "$HERE/audio.json" --out "$BUILD/spiriti-audio.block"
-python3 -m prg32 cartridge build "$HERE/game.c" \
-  --portable --entry-prefix spiriti_napoli97 --name spiriti-napoli97 \
-  --audio-block "$BUILD/spiriti-audio.block" --out "$BUILD/spiriti-base.prg32"
 for arch in esp32c6 qemu; do
-  python3 -m prg32 store attach-metadata "$BUILD/spiriti-base.prg32" \
+  python3 -m prg32 cartridge build "$HERE/game.c" \
+    --portable --entry-prefix spiriti_napoli97 --name spiriti-napoli97 \
+    --architecture "$arch" --audio-block "$BUILD/spiriti-audio.block" \
+    --out "$BUILD/spiriti-$arch.raw.prg32"
+  python3 -m prg32 store attach-metadata "$BUILD/spiriti-$arch.raw.prg32" \
     --metadata "$HERE/metadata.json" --icon "$HERE/icon.png" \
     --screenshot "$HERE/screenshot.png" --colophon "$HERE/colophon.json" \
     --architecture "$arch" --out "$STORE/spiriti-napoli97-$arch.prg32"

@@ -1,6 +1,6 @@
 # PRG32 integration notes
 
-Target branch: `development-c6`.
+Target branch: `main`.
 
 The cartridge exports `spiriti_napoli97_init`, `spiriti_napoli97_update`, and `spiriti_napoli97_draw`. `build.sh` builds with `--portable`, the matching `--entry-prefix`, and a procedural AUDIO block, then attaches Store metadata for `esp32c6` and `qemu`.
 
