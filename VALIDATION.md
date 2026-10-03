@@ -1,53 +1,30 @@
-# Validation status — 1.2.3
+# Validation status — 2.0.0
 
-## Completed in this package
+## Verified
 
-- Strict host C syntax check (`clang -std=c11 -Wall -Wextra -Werror`) against the cartridge API stub.
-- JSON validation for `audio.json`, `metadata.json`, `manifest.json`, and `colophon.json`.
-- Deterministic regeneration of `assets.h` from checked-in `assets-src/` PNGs.
-- Official portable cartridge build: 26,216 bytes of code and 26,320 bytes of runtime memory, within the 32 KiB runtime slot.
-- Complete two-architecture Store bundle: 115,765 bytes (113.1 KiB), within the 128 KiB distribution ceiling.
-- 4-bpp indexed generation for the Fiat, hunter, six ghosts, boss and repeated props.
-- Coherent 24-colour tile-engine generation for the Naples overview map and five district background families.
-- Portable-code review: no hard-coded firmware addresses and no global/static sprite descriptor containing pointers to other cartridge objects.
-- Metadata declares `esp32c6` and `qemu` Store architectures.
-- Music/SFX are procedural SID-like descriptors; no copyrighted recording or Ghostbusters soundtrack melody is bundled.
+- `./test.sh`: static checks, strict C99, and the host harness. A bot plays all seven jobs to the good ending in 5499 frames; the ESP32-C6 and QEMU display models show identical pixels in every frame without a fade or flash; overheating, an escaped spirit, giving up, the empty till, PK overload, slime, espresso, lane changes, a press between steps and slow frames are each asserted. At most 203 sprite and 283 primitive draws per frame.
+- The source compiles against the public headers of PRG32 `main` at `a8669e5`.
+- `./build.sh` against that commit: 38348 bytes of code, 38800 bytes of memory, 4264 bytes of audio; each Store cartridge is 55794 bytes of the 65536 allowed.
+- The Cartridge Store's intake code (`_prepare_bundle`) accepts `dist/spiriti-napoli97-2.0.0-store.zip` and rebuilds both architectures.
+- QEMU: the firmware loads the cartridge from `cart0`; title, map, drive, capture, result and the return to the map were played through the UART keyboard, the capture by a bot that reads the picture. `preview.mp4` (27 s, 640x400 H.264, 22050 Hz mono AAC) and `screenshot.png` come from that run; the soundtrack is audible throughout and does not clip. The QEMU frames were compared by eye with the harness renders of the same screens.
+- `tools/generate_assets.py` and `tools/generate_audio.py` reproduce `assets.h` and `audio.json` byte for byte.
 
-## Historical validation with PRG32 `development-c6`
+## Not verified
 
-The official compiler and packer produced both `esp32c6` and `qemu` packages, inspected their metadata, and packed the Store bundle. QEMU smoke-test results are recorded below. Physical ESP32-C6 hardware validation remains required before publication.
+- **Physical ESP32-C6.** Colours, frame rate and stereo panning on two MAX98357A boards have not been checked on hardware. The colour match with QEMU is established on a model of the firmware's palette code, not on the panel. Every frame redraws the whole screen, so the frame rate is bounded by the full-screen SPI transfer; the game logic keeps its pace regardless.
+- QEMU's audio is mono, so stereo panning was exercised only in the harness.
+- In QEMU only the first job was played; the other districts and the endings were played in the harness.
 
-The QEMU firmware booted, initialized its 320x240 framebuffer and audio stream, and autoloaded the cartridge from `cart0`. The runtime reported the expected 26,216-byte code, 26,320-byte memory and 2,904-byte audio sizes. Injected title/game controls produced no panic or runtime fault during the smoke window.
+## Note on the QEMU firmware build
 
-The publishing preview was captured from real QEMU execution: exactly 30.00 seconds, 320x200 H.264 at 30 fps, with a 22,050 Hz mono AAC soundtrack sourced from PRG32's UART PCM stream. Audio verification measured -28.4 dB mean and -16.1 dB peak. Representative frames cover the dispatch map, driving and spirit-capture/beam sequences. The embedded Store screenshot is an indexed PNG extracted from that recording rather than a synthetic mockup.
+PRG32 `main` at `a8669e5` did not build for QEMU with ESP-IDF v5.4: `components/prg32` includes `esp_crt_bundle.h` without requiring `mbedtls`. The test firmware was built from a scratch copy with `mbedtls` added to the component's `PRIV_REQUIRES`. The cartridge itself is built with the unmodified tools.
 
-From a current PRG32 `main` checkout:
+## Reproduce
 
 ```sh
-source "$HOME/esp-idf/export.sh"
-cd /path/to/PRG32
-python3 -m prg32 doctor
-cd cartridges/spiriti-napoli97
+export PRG32_REPO=/path/to/PRG32
 ./build.sh
+(cd "$PRG32_REPO" && python3 -m prg32 qemu build)
+python3 tools/qemu_capture.py
+./build.sh          # embeds the new screenshot
 ```
-
-Reproduce the package checks with:
-
-```sh
-python3 -m prg32 cartridge summary dist/store/spiriti-napoli97-esp32c6.prg32
-python3 -m prg32 store inspect-metadata dist/store/spiriti-napoli97-esp32c6.prg32
-python3 -m prg32 cartridge summary dist/store/spiriti-napoli97-qemu.prg32
-cd "$PRG32_REPO"
-python3 -m prg32 qemu upload ../spiriti-napoli97/dist/store/spiriti-napoli97-qemu.prg32
-python3 -m prg32 qemu run
-```
-
-On physical ESP32-C6, exercise title -> tile map -> driving -> capture -> result -> map, all six districts, the boss, scoreboard, mono/stereo audio fallback, abort/restart, and prolonged beam/drive rendering.
-
-## Current `main` build compatibility
-
-`build.sh` now compiles separate portable payloads with explicit `--architecture`
-values for ESP32-C6 and QEMU. `test.sh` checks the source against the public
-headers from the same PRG32 checkout used for packaging. The measurements
-above record the earlier `development-c6` validation and are not guarantees
-for later PRG32 revisions.

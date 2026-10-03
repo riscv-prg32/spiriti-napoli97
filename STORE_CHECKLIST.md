@@ -1,22 +1,14 @@
-# Cartridge Store release checklist — 1.2.3
+# Cartridge Store release checklist — 2.0.0
 
-- [x] Original game identity: `Spiriti! Napoli '97`.
-- [x] Colophon explicitly identifies the cartridge as an unofficial tribute game.
-- [x] Original/project-created title treatment, pixel art source, code, text, tracker composition and SFX; no copied Ghostbusters soundtrack recording/game data.
-- [x] Portable ABI build script uses `--portable`.
-- [x] Store metadata entries for `esp32c6` and `qemu`.
-- [x] Metadata, manifest, colophon, icon and 320x200 runtime-asset preview included.
-- [x] PRG32 tile/playfield map and district backgrounds.
-- [x] Compact 4-bpp indexed sprites and props with transparency.
-- [x] SID-like procedural music/SFX with stereo pan and mono fallback.
-- [x] Strict host syntax and JSON checks pass.
-- [x] Portable runtime uses 26,320 of 32,768 available bytes.
-- [x] Build with the current `main` PRG32 toolchain.
-- [x] Confirm final two-architecture Store bundle size < 128 KiB via the official packer (113.1 KiB).
-- [x] Validate the QEMU preview: 30.00 seconds, 320x200 H.264/30 fps, 22,050 Hz mono AAC with audible soundtrack.
-- [x] Replace the deterministic asset mockup with a real QEMU screenshot and 30-second audiovisual capture.
-- [x] QEMU firmware boot, cartridge autoload and injected-control smoke test.
-- [ ] Smoke-test all six district tile scenes on QEMU.
-- [ ] Smoke-test physical ESP32-C6 frame rate while the boss + beam are active.
-- [ ] Verify mono and stereo I2S paths plus scoreboard.
-- [x] Run repository-level `git diff --check` and host validation.
+- [x] `make assets` regenerates `assets.h` and `audio.json` with no diff.
+- [x] `./test.sh` passes (static checks, strict C99, bot playthrough on both display models).
+- [x] `./build.sh` against `riscv-prg32/PRG32` `main` (commit `a8669e5`).
+- [x] Both `.prg32` files are within 65536 bytes (55794).
+- [x] Manifest is `prg32-metadata-1.0`; versions agree in metadata, colophon and changelog.
+- [x] The Cartridge Store intake code accepts the bundle.
+- [x] Colophon and metadata identify the cartridge as an unofficial tribute.
+- [x] QEMU: boots from the cartridge, title, map, drive, capture, music and effects (`make capture`).
+- [x] Store screenshot and `preview.mp4` are real QEMU captures.
+- [ ] ESP32-C6: colours match QEMU, frame rate is acceptable, stereo panning on two MAX98357A boards.
+- [ ] Publish `dist/spiriti-napoli97-2.0.0-store.zip` to the Cartridge Store.
+- [ ] Tag the version after the hardware run.

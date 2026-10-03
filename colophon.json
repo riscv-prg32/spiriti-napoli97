@@ -2,43 +2,32 @@
   "abi": "prg32-colophon-1.0",
   "title": "Spiriti! Napoli '97",
   "subtitle": "Unofficial Ghostbusters-inspired tribute game set in Naples, 1997",
-  "version": "1.2.3",
-  "release_date": "2026-09-09",
-  "developer": {
-    "name": "PRG32 Tribute Cartridge Contributors"
-  },
-  "authors": [
-    "PRG32 Tribute Cartridge Contributors"
-  ],
+  "version": "2.0.0",
+  "release_date": "2026-10-04",
+  "developer": {"name": "PRG32 Tribute Cartridge Contributors"},
+  "authors": ["PRG32 Tribute Cartridge Contributors"],
   "license": "MIT",
+  "technology": [
+    "PRG32 portable ABI-table cartridge for the default 64 KiB cartridge-RAM profile",
+    "4-bpp palette-indexed tiles and sprites, one colour per system-cube cell for exact colours on the ESP32-C6",
+    "palette effects: fades, capture flash, glowing spirits, cycling proton beam, sky stained by PK energy, lightning",
+    "row parallax along the lungomare with a sky gradient on reserved palette entries",
+    "ten SID-like procedural instruments, eight tracker tracks, stereo-panned effects on four voices"
+  ],
   "acknowledgements": [
     "A tribute to the paranormal-comedy arcade tradition popularized by Ghostbusters and 1980s home-computer games",
-    "Built for PRG32 development-c6",
-    "Set in Naples, Italy, in 1997"
+    "Built for riscv-prg32/PRG32 main",
+    "Set in Naples, Italy, in 1997",
+    "Original soundtrack; no film, television or game theme is quoted"
   ],
-  "content_notice": "TRIBUTE GAME \u2014 unofficial and unaffiliated. Ghostbusters is referenced only to identify the work being paid tribute to. The game uses original branding, artwork, music, SFX, and code designed to evoke the era without reproducing protected franchise assets.",
+  "content_notice": "TRIBUTE GAME - unofficial and unaffiliated. Ghostbusters is referenced only to identify the work being paid tribute to. The game uses original branding, artwork, music, effects and code designed to evoke the era without reproducing protected franchise assets.",
   "controls": [
-    {
-      "input": "A",
-      "action": "Start / dispatch / proton beam"
-    },
-    {
-      "input": "B",
-      "action": "Back / abort job"
-    },
-    {
-      "input": "LEFT/RIGHT",
-      "action": "Choose district / steer Fiat 500 / move trap"
-    },
-    {
-      "input": "UP/DOWN",
-      "action": "Choose district"
-    },
-    {
-      "input": "SELECT",
-      "action": "Show high scores"
-    }
+    {"input": "LEFT / RIGHT", "action": "Map: choose a district. Drive: brake / accelerate. Capture: move the trap"},
+    {"input": "UP / DOWN", "action": "Map: choose a district. Drive: change lane"},
+    {"input": "A", "action": "Start, dispatch the Fiat, fire the proton beam"},
+    {"input": "B", "action": "Back to the title, return to base, give the job up"},
+    {"input": "SELECT", "action": "High scores"}
   ],
   "start_prompt": "Press A to start the night shift",
-  "tribute_statement": "Spiriti! Napoli '97 is an unofficial, non-commercial tribute game celebrating the paranormal-comedy arcade tradition associated with Ghostbusters and the 1984 era. It is not affiliated with, endorsed by, or sponsored by the Ghostbusters rights holders. All cartridge code, pixel artwork, title treatment, arrangements, melodies, sound effects, and recordings in this project are original; no Ghostbusters logo, character art, dialogue, soundtrack melody, recording, or game asset is included."
+  "tribute_statement": "Spiriti! Napoli '97 is an unofficial, non-commercial tribute game celebrating the paranormal-comedy arcade tradition associated with Ghostbusters and the 1984 era. It is not affiliated with, endorsed by, or sponsored by the Ghostbusters rights holders. All cartridge code, pixel artwork, title treatment, melodies and sound effects in this project are original; no Ghostbusters logo, character art, dialogue, soundtrack melody, recording, or game asset is included."
 }
