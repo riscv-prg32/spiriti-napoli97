@@ -1,20 +1,23 @@
 #!/usr/bin/env python3
-"""Run the cartridge in PRG32's QEMU firmware and record what it really does.
+"""Play the cartridge in PRG32's QEMU firmware and record what it really does.
 
 The cartridge is staged into a private copy of the firmware's flash image and
 booted in Espressif QEMU. The tool then:
 
-- plays a demo through the UART keyboard mapper: title, map and drive from a
-  script, then the capture by looking at the picture, like a player would;
 - copies the firmware's 320x240 frame buffer out of guest memory with the
   QEMU monitor's `pmemsave` (no screen-recording permission needed) and keeps
   the 320x200 playfield;
+- plays the whole game through the UART keyboard mapper by looking at those
+  frames, as a player would: it reads which screen is up from the colours of
+  the status bands, finds the spirit at the end of its own beam, the trap, the
+  giant and the car by their colours, and the heat from its gauge;
 - feeds the firmware's credit-paced UART audio and records the 22050 Hz PCM;
-- writes PNG screenshots and, with ffmpeg, preview.mp4 with the real soundtrack;
-- keeps the capture frame with the most beam and trap light as the Store
-  screenshot (screenshot.png). Run ./build.sh again afterwards to embed it.
+- writes PNG screenshots of each stage, the Store screenshot (the piazza
+  fight) and, with ffmpeg, preview.mp4: the first call-out, then everything
+  from Villa Doria d'Angri to the parade, with the real soundtrack.
 
-Usage (after `python3 -m prg32 qemu build` in the PRG32 checkout and ./build.sh):
+Usage (after `python3 -m prg32 qemu build` in the PRG32 checkout and ./build.sh;
+run ./build.sh again afterwards to embed the new screenshot):
 
     PRG32_REPO=/path/to/PRG32 python3 tools/qemu_capture.py
 """
@@ -39,60 +42,116 @@ GAME = Path(__file__).resolve().parents[1]
 RATE = 22050
 CONSOLE_PORT, AUDIO_PORT, MONITOR_PORT = 5551, 4321, 5552
 
-# Demo script, in seconds after the title screen is up: (start, end, keys).
-# Keys are held by resending them faster than the firmware's 120 ms key hold.
 RIGHT, LEFT, UP, DOWN, A, B, SELECT = "d", "a", "w", "s", "j", "k", " "
-DEMO = [
-    (2.0, 2.1, A),                                   # start the shift
-    (4.5, 4.6, A),                                   # dispatch to Centro Storico
-    (6.0, 30.0, RIGHT),                              # floor it along the lungomare
-    (8.0, 8.1, UP), (10.5, 10.6, DOWN), (12.0, 12.1, DOWN), (14.5, 14.6, UP), (17.0, 17.1, UP), (19.5, 19.6, DOWN),
-]
-SHOTS = {"title": 1.2, "map": 3.6, "drive": 12.0}
-DRIVE_FROM = 6.0         # the scripted part ends when the capture screen appears
-OUTRO = 5.0              # seconds recorded after the capture: the result and the map
+HUD_Y = 176
+LANE_SHADOW_ROWS = (135, 151, 167)       # where a flying spirit's shadow falls in each lane
 
 
-def on_capture_screen(a: np.ndarray) -> bool:
-    """Capture screen: a yellow district name in the top band, cyan CATTURA in the bottom one."""
-    top, low = a[4:12, 4:60], a[179:187, 4:60]
-    yellow = ((top[:, :, 0] > 240) & (top[:, :, 1] > 240) & (top[:, :, 2] < 40)).sum()
-    cyan = ((low[:, :, 0] < 40) & (low[:, :, 1] > 240) & (low[:, :, 2] > 240)).sum()
-    return yellow > 20 and cyan > 20
+def count(a: np.ndarray, box: tuple[int, int, int, int], colour: str) -> int:
+    """Pixels of a named colour in box (x0, y0, x1, y1)."""
+    x0, y0, x1, y1 = box
+    r, g, b = a[y0:y1, x0:x1, 0], a[y0:y1, x0:x1, 1], a[y0:y1, x0:x1, 2]
+    if colour == "yellow":
+        m = (r > 240) & (g > 240) & (b < 40)
+    elif colour == "cyan":
+        m = (r < 40) & (g > 240) & (b > 240)
+    elif colour == "green":
+        m = (r < 40) & (g > 240) & (b < 40)
+    elif colour == "red":
+        m = (r > 240) & (g < 40) & (b < 40)
+    elif colour == "white":
+        m = (r > 250) & (g > 250) & (b > 250)
+    else:
+        m = (r < 6) & (g < 6) & (b < 6)
+    return int(m.sum())
 
 
-def capture_keys(a: np.ndarray, state: dict) -> str:
-    """Play the capture from the picture: keep the trap under the spirit, fire in bursts."""
-    keys = ""
-    band = a[148:162, 60:]
-    red = (band[:, :, 0] > 200) & (band[:, :, 1] < 90) & (band[:, :, 2] < 110)
-    area = a[30:124, 64:]
-    bright = (area[:, :, 0] > 225) & (area[:, :, 1] > 235) & (area[:, :, 2] > 235)
-    if red.sum() >= 4 and bright.sum() >= 20:
-        trap = 60 + float(np.median(np.nonzero(red)[1]))
-        spirit = 64 + float(np.median(np.nonzero(bright)[1]))
-        if trap < spirit - 8:
-            keys += RIGHT
-        if trap > spirit + 8:
-            keys += LEFT
+def screen(a: np.ndarray) -> str:
+    """Which screen is up, from the colours of the text in the two bands."""
+    top, low = (4, 4, 100, 12), (4, 179, 56, 187)
+    if count(a, top, "green") > 20:
+        return "title"
+    if count(a, top, "cyan") > 20:
+        return "drive"
+    if count(a, top, "red") > 20:
+        return "omen"
+    if count(a, top, "yellow") > 20:
+        if count(a, low, "cyan") > 20:
+            if count(a, (180, 4, 208, 12), "red") > 3:
+                return "piazza"
+            return "villa" if count(a, (64, 180, 148, 186), "red") > 30 else "capture"
+        if count(a, low, "yellow") > 20:
+            return "map"
+        if count(a, (88, 189, 232, 197), "cyan") > 40:
+            return "over"
+        return "result"
+    return "other"
+
+
+def heat_keys(a: np.ndarray, state: dict) -> str:
+    """Fire in bursts: stop before the pack vents, start again when it has cooled."""
     bar = a[181:185, 212:312]
     heat = float(((bar[:, :, 0] > 200) & (bar[:, :, 2] < 80)).any(axis=0).mean())
-    if heat > 0.85:
+    if heat > 0.82:
         state["cooling"] = True
     if heat < 0.35:
         state["cooling"] = False
-    if not state.get("cooling"):
-        keys += A
-    return keys
+    return "" if state.get("cooling") else A
 
 
-def cone_score(a: np.ndarray) -> int:
-    """Pixels of the trap's pale light cone while the beam is on: the Store
-    screenshot is the capture frame with the most."""
-    play = a[16:176]
-    beam = ((play[:, :, 0] < 40) & (play[:, :, 1] > 240) & (play[:, :, 2] > 240)).sum()
-    cone = ((play[:, :, 0] > 150) & (play[:, :, 0] < 190) & (play[:, :, 1] > 240) & (play[:, :, 2] > 240)).sum()
-    return int(cone) if beam > 30 else 0
+def median_x(mask: np.ndarray, offset: int = 0) -> float | None:
+    xs = np.nonzero(mask)[1]
+    return offset + float(np.median(xs)) if len(xs) >= 4 else None
+
+
+def play(a: np.ndarray, where: str, now: float, state: dict) -> str:
+    """The keys to hold for this frame."""
+    r, g, b = a[:, :, 0], a[:, :, 1], a[:, :, 2]
+    if where in ("title", "map"):
+        return A if now - state.get("tapped", -9.0) > 1.2 and not state.update(tapped=now) else ""
+    if where == "drive":
+        keys = RIGHT
+        lane = state.setdefault("lane", 1)
+        if state.get("drive_seen") != state.get("drives"):          # a new drive starts in the middle lane
+            state["drive_seen"] = state.get("drives")
+            lane = state["lane"] = 1
+        shadow = [count(a, (110, y, 300, y + 2), "black") >= 10 for y in LANE_SHADOW_ROWS]
+        if shadow[lane] and now - state.get("steered", -9.0) > 0.35:
+            want = next((n for n in (lane - 1, lane + 1) if 0 <= n <= 2 and not shadow[n]), None)
+            if want is not None:
+                keys += UP if want < lane else DOWN
+                state["lane"], state["steered"] = want, now
+        return keys
+    if where == "capture":
+        keys = heat_keys(a, state)
+        beam = (r[20:150] < 40) & (g[20:150] > 240) & (b[20:150] > 240)
+        rows_hit = np.nonzero(beam.any(axis=1))[0]
+        if len(rows_hit):                                           # the spirit is where the beam ends
+            state["spirit"] = median_x(beam[rows_hit[0]:rows_hit[0] + 6]) or state.get("spirit")
+        trap = median_x((r[148:162, 60:] > 200) & (g[148:162, 60:] < 90) & (b[148:162, 60:] < 110), 60)
+        if trap is not None and state.get("spirit") is not None:
+            if trap < state["spirit"] - 8:
+                keys += RIGHT
+            if trap > state["spirit"] + 8:
+                keys += LEFT
+        return keys
+    if where == "villa":                                            # never stand still under the fire
+        return heat_keys(a, state) + (LEFT if int(now / 2.5) % 2 else RIGHT)
+    if where == "piazza":
+        giant = median_x((r[30:130] > 250) & (g[30:130] > 250) & (b[30:130] > 250))
+        car = median_x((r[146:172] > 200) & (g[146:172] < 90) & (b[146:172] < 110))
+        bound = count(a, (160, 189, 284, 197), "yellow") > 20
+        keys = "" if bound else heat_keys(a, state)
+        if giant is not None and car is not None:
+            if car < giant - 10:
+                keys += RIGHT
+            if car > giant + 10:
+                keys += LEFT
+            if bound and abs(car - giant) < 40 and now - state.get("trap", -9.0) > 0.5:
+                keys += B
+                state["trap"] = now
+        return keys
+    return ""
 
 
 def connect(port: int, process: subprocess.Popen, timeout: float = 20.0) -> socket.socket:
@@ -111,6 +170,7 @@ def audio_worker(process: subprocess.Popen, samples: bytearray, recording: threa
                  stopping: threading.Event) -> None:
     """Grant one 20 ms credit at a time, as the host audio player does."""
     sock = connect(AUDIO_PORT, process)
+    sock.settimeout(None)       # a busy host must not end the stream: the firmware waits for these credits
     chunk = 441 * 2
     try:
         sock.sendall(b"K")
@@ -185,9 +245,8 @@ def main() -> int:
     parser.add_argument("--prg32-root", type=Path, default=Path(os.environ.get("PRG32_REPO", os.environ.get("PRG32_ROOT", GAME.parent / "PRG32"))))
     parser.add_argument("--cartridge", type=Path, default=GAME / "build/spiriti-napoli97-base.prg32")
     parser.add_argument("--out", type=Path, default=GAME / "release-artifacts")
-    parser.add_argument("--duration", type=float, default=75.0, help="upper limit; the demo stops after the first capture")
+    parser.add_argument("--duration", type=float, default=540.0, help="upper limit; the run stops at an ending")
     parser.add_argument("--warmup", type=float, default=7.0, help="seconds from reset to the title screen")
-    parser.add_argument("--store-shot", default="capture", help="shot copied to screenshot.png")
     parser.add_argument("--display", default="sdl", help="QEMU display back end; the firmware stalls with `none`")
     args = parser.parse_args()
 
@@ -234,32 +293,34 @@ def main() -> int:
         for thread in threads[1:]:
             thread.start()
         frames: list[tuple[float, Path]] = []
+        seen: dict[str, float] = {}          # when each screen was first shown
+        story: list[str] = []
         try:
             time.sleep(args.warmup)
             recording.set()
             start = time.monotonic()
-            pending = dict(SHOTS)
-            best_score = -1
             last_key: dict[str, float] = {}
-            index = 0
-            bot: dict = {}
-            capturing, stop_at = False, args.duration
+            state: dict = {"drives": 0}
+            index, stop_at, previous, best = 0, args.duration, "", -1
             while (now := time.monotonic() - start) < stop_at:
                 image = grab(monitor, fb_address, temp / "panel.bin")
                 if image is None:
                     continue
                 pixels = np.asarray(image).astype(int)
-                on_capture = now >= DRIVE_FROM and on_capture_screen(pixels)
-                if on_capture:
-                    capturing = True
-                    keys = capture_keys(pixels, bot)
-                elif capturing:
-                    keys = ""
-                    stop_at = min(stop_at, now + OUTRO)      # caught or lost: record the outcome and stop
-                    capturing = False
-                else:
-                    keys = "" if stop_at < args.duration else "".join(k for b, e, k in DEMO if b <= now < e)
-                for key in keys:
+                where = screen(pixels)
+                if where != previous and where != "other":
+                    story.append(f"{now:6.1f} s  {where}")
+                    if where == "drive":
+                        state["drives"] += 1
+                    if where in ("capture", "villa", "piazza"):
+                        state.pop("spirit", None)
+                        state["cooling"] = False
+                    if where == "over":
+                        stop_at = min(stop_at, now + 9.0)        # the ending: record it and stop
+                    previous = where
+                if where != "other" and where not in seen:
+                    seen[where] = now
+                for key in play(pixels, where, now, state):
                     if now - last_key.get(key, -1.0) >= 0.06:
                         console.sendall(key.encode())
                         last_key[key] = now
@@ -268,16 +329,16 @@ def main() -> int:
                 image.save(frame)
                 frames.append((now, frame))
                 index += 1
-                if on_capture and cone_score(pixels) > best_score:
-                    best_score = cone_score(pixels)
-                    image.save(shots_dir / "capture.png", optimize=True)
-                for name, when in list(pending.items()):
-                    if now >= when:
-                        image.save(shots_dir / f"{name}.png", optimize=True)
-                        del pending[name]
-            args.duration = min(args.duration, now)
+                # One screenshot per stage, a couple of seconds in; the piazza frame with the most beam is the Store's.
+                if where != "other" and now - seen[where] >= (4.0 if where in ("drive", "omen") else 0.0 if where == "title" else 1.5) and where + "!" not in seen:
+                    seen[where + "!"] = now
+                    image.save(shots_dir / f"{where}.png", optimize=True)
+                if where == "piazza" and count(pixels, (0, 16, 320, 176), "cyan") > best:
+                    best = count(pixels, (0, 16, 320, 176), "cyan")
+                    image.save(shots_dir / "store.png", optimize=True)
             if process.poll() is not None:
                 raise RuntimeError("QEMU stopped during the capture")
+            end = now
         finally:
             stopping.set()
             process.terminate()
@@ -285,38 +346,47 @@ def main() -> int:
             for sock in (console, monitor):
                 sock.close()
             log = [line for line in bytes(transcript).decode(errors="replace").splitlines()
-                   if not line.startswith("TRACKER ")]          # drop the firmware's per-note trace
+                   if not line.startswith(("TRACKER ", "PLAY_TRACK "))]      # drop the firmware's per-note trace
             (shots_dir / "boot-log.txt").write_text("\n".join(log) + "\n")
+            (shots_dir / "playthrough.txt").write_text("\n".join(story) + "\n")
             if not frames:
                 print(monitor_log.decode(errors="replace")[-600:])
 
-        shot = shots_dir / f"{args.store_shot}.png"
-        if args.out.resolve() == (GAME / "release-artifacts").resolve() and shot.exists():
-            Image.open(shot).quantize(colors=64, dither=Image.Dither.NONE).save(GAME / "screenshot.png", optimize=True)
+        print("\n".join(story))
         if len(frames) < 10:
             raise SystemExit("QEMU produced no frames; see release-artifacts/qemu/boot-log.txt")
-        distinct = len({Image.open(path).tobytes() for _, path in frames[:: max(1, len(frames) // 40)]})
-        print(f"{len(frames)} frames in {args.duration:g} s ({len(frames) / args.duration:.1f} fps), "
-              f"{distinct} distinct in a sample of 40, {len(samples) // 2} audio samples")
-        with wave.open(str(temp / "audio.wav"), "wb") as wav:
-            wav.setnchannels(1)
-            wav.setsampwidth(2)
-            wav.setframerate(RATE)
-            wav.writeframes(bytes(samples[: int(args.duration * RATE) * 2]))
+        print(f"{len(frames)} frames in {end:.0f} s ({len(frames) / end:.1f} fps), {len(samples) // 2} audio samples")
+        if "over" not in seen:
+            raise SystemExit("the run did not reach an ending")
+        store = shots_dir / "store.png"
+        if args.out.resolve() == (GAME / "release-artifacts").resolve() and store.exists():
+            Image.open(store).quantize(colors=64, dither=Image.Dither.NONE).save(GAME / "screenshot.png", optimize=True)
         if ffmpeg:
-            listing = temp / "frames.txt"
+            # The preview: the first call-out, then from the villa to the end.
+            cuts = [(0.0, min(end, seen.get("result", 30.0) + 4.0))]
+            if "villa" in seen:
+                cuts.append((seen["villa"], end))
+            pcm = bytearray()
             lines = []
-            for i, (when, path) in enumerate(frames):
-                nxt = frames[i + 1][0] if i + 1 < len(frames) else args.duration
-                lines += [f"file '{path}'", f"duration {max(nxt - when, 0.001):.4f}"]
+            for begin, finish in cuts:
+                pcm += samples[int(begin * RATE) * 2:int(finish * RATE) * 2]
+                chosen = [(when, path) for when, path in frames if begin <= when < finish]
+                for i, (when, path) in enumerate(chosen):
+                    nxt = chosen[i + 1][0] if i + 1 < len(chosen) else finish
+                    lines += [f"file '{path}'", f"duration {max(nxt - when, 0.001):.4f}"]
             lines.append(f"file '{frames[-1][1]}'")
-            listing.write_text("\n".join(lines) + "\n")
+            (temp / "frames.txt").write_text("\n".join(lines) + "\n")
+            with wave.open(str(temp / "audio.wav"), "wb") as wav:
+                wav.setnchannels(1)
+                wav.setsampwidth(2)
+                wav.setframerate(RATE)
+                wav.writeframes(bytes(pcm))
             video = GAME / "preview.mp4"
-            subprocess.run([ffmpeg, "-loglevel", "error", "-y", "-f", "concat", "-safe", "0", "-i", str(listing),
-                            "-i", str(temp / "audio.wav"), "-vf", "scale=640:400:flags=neighbor,fps=30",
-                            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "26", "-c:a", "aac", "-b:a", "96k",
-                            "-t", f"{args.duration:g}", "-movflags", "+faststart", str(video)], check=True)
-            print(f"wrote {video}")
+            subprocess.run([ffmpeg, "-loglevel", "error", "-y", "-f", "concat", "-safe", "0", "-i", str(temp / "frames.txt"),
+                            "-i", str(temp / "audio.wav"), "-vf", "scale=640:400:flags=neighbor,fps=20",
+                            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "33", "-c:a", "aac", "-b:a", "48k",
+                            "-shortest", "-movflags", "+faststart", str(video)], check=True)
+            print(f"wrote {video} ({video.stat().st_size // 1024} KiB)")
     return 0
 
 

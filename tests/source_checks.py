@@ -62,25 +62,61 @@ shared.add(define("SN_UI_NAVY"))
 distinct("shared colours", shared)
 scenes = define("SN_SCENE_COUNT")
 scene_pal, far_pal = array("sn_scene_pal"), array("sn_far_pal")
-# Scene of each spirit sprite, as haunt_spirit() in game.c pairs them; the title shows ghost 0 at Mergellina.
-SPIRITS = {0: ["ghost0"], 1: ["ghost0", "ghost1"], 2: ["ghost3"], 3: ["ghost2"], 4: ["ghost4"], 5: ["ghost5"], 6: ["boss"]}
-if len(scene_pal) != scenes * 16 or len(far_pal) != scenes * 4 or scenes != len(SPIRITS):
+# The spirit drawn in each scene, as game.c pairs them: six districts, the villa's guardian, the
+# piazza (the giant uses reserved entries only) and the lungomare of the title and the endings.
+SPIRITS = {0: ["ghost0"], 1: ["ghost1"], 2: ["ghost3"], 3: ["ghost2"], 4: ["ghost4"], 5: ["ghost5"], 6: ["boss"],
+           7: [], 8: ["ghost0"]}
+if len(scene_pal) != scenes * 16 or len(far_pal) != 4 or scenes != len(SPIRITS):
     fail("scene palettes do not match the scene count")
 for scene, spirits in SPIRITS.items():
-    here = shared | set(scene_pal[scene * 16 + 1:(scene + 1) * 16]) | set(far_pal[scene * 4 + 1:(scene + 1) * 4])
+    here = shared | set(scene_pal[scene * 16 + 1:(scene + 1) * 16])
+    if scene == 8:
+        here |= set(far_pal[1:])
+    distinct(f"scene {scene}", here)
     for spirit in spirits:
         distinct(f"scene {scene} with {spirit}", here | set(array(f"sn_{spirit}_pal")[1:]))
 
-maps = array("sn_scene_maps") + array("sn_road_map")
-if len(maps) != (scenes + 1) * define("SN_SCENE_COLS") * define("SN_SCENE_ROWS"):
-    fail("scene map size")
-if any(code > define("SN_TILE_COUNT") for code in maps):
-    fail("unknown tile code in a scene map")
+cells = define("SN_SCENE_COLS") * define("SN_SCENE_ROWS")
+maps = array("sn_shore_map") + array("sn_road_map") + array("sn_ground")
+if len(maps) != 2 * cells + scenes * 3 or any(code > define("SN_TILE_COUNT") for code in maps):
+    fail("tile maps")
 if len(array("sn_tiles")) != define("SN_TILE_COUNT") * 128:
     fail("tile bank size")
-runs = array("sn_map_runs")
-if len(runs) != define("SN_MAP_LAYERS") * define("SN_MAP_ROWS") * define("SN_MAP_RUNS") * 2 or max(runs) > 80:
-    fail("dispatch map runs")
+
+
+def picture_rows(name, width):
+    """Walk a picture as game.c does; every band must fill the width exactly."""
+    data = array(name)
+    i = rows = 0
+    while data[i]:
+        rows += data[i]
+        i += 1
+        x = 0
+        while x < width:
+            n = (data[i] & 15) + 1
+            i += 1
+            if n == 16:
+                n = data[i]
+                i += 1
+            x += n
+        if x != width:
+            fail(f"{name}: a band overruns its width")
+    if i != len(data) - 1:
+        fail(f"{name}: data after the terminator")
+    return rows
+
+
+for scene in range(8):
+    if picture_rows(f"sn_pic{scene}", define("SN_PIC_W")) not in (56, 64, 80):
+        fail(f"sn_pic{scene}: unexpected height")
+for name in ("far", "logo", "gulf", "pulci0", "pulci1"):
+    if picture_rows(f"sn_{name}_pic", define(f"SN_{name.upper()}_W")) != define(f"SN_{name.upper()}_H"):
+        fail(f"sn_{name}_pic: wrong height")
+if not (ROOT / "assets-src/villa_doria_dangri.jpg").exists():
+    fail("the Villa Doria d'Angri photograph is missing")
+for token in ("SCEGLI LA FORMA", "DEL DISTRUTTORE", "PIAZZA DEL PLEBISCITO", "VILLA DORIA D'ANGRI", "prg32_audio_set_tempo"):
+    if token not in game:
+        fail(f"missing: {token}")
 
 # Audio: procedural instruments only, music on voices 0-3, every track ends or loops.
 if audio.get("samples"):
@@ -97,11 +133,11 @@ for number, track in enumerate(audio["tracks"]):
         fail(f"track {number} does not end")
     if events[-1]["command"] == "JUMP" and events[events[-1]["arg0"]]["command"] not in ("NOTE_ON", "NOTE_OFF"):
         fail(f"track {number} loops into its set-up events")
-if len(audio["tracks"]) != 8 or len(audio["instruments"]) != 10:
+if len(audio["tracks"]) != 10 or len(audio["instruments"]) != 10:
     fail("audio.json does not match the voices game.c uses")
 
 if colophon["version"] != meta["version"] or colophon["title"] != meta["title"]:
     fail("metadata and colophon disagree")
 if f"## {meta['version']}" not in (ROOT / "CHANGELOG.md").read_text():
     fail("CHANGELOG.md has no entry for this version")
-print(f"OK: {scenes} districts, {define('SN_TILE_COUNT')} tiles, {len(audio['tracks'])} tracks, version {meta['version']}")
+print(f"OK: {scenes} scenes, {define('SN_TILE_COUNT')} tiles, {len(audio['tracks'])} tracks, version {meta['version']}")

@@ -35,6 +35,7 @@ void prg32_band_set_game_info(const char *text);
 
 prg32_audio_mode_t prg32_audio_get_mode(void);
 void prg32_audio_play_track(uint16_t track_id);
+void prg32_audio_set_tempo(uint16_t bpm);
 void prg32_audio_note_on_pan(uint8_t channel, uint8_t instrument, uint8_t note, uint8_t volume, int8_t pan);
 void prg32_audio_note_off(uint8_t channel);
 

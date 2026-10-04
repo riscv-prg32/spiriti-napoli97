@@ -19,8 +19,10 @@ from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "release-artifacts"
-SHEET = ["01-titolo", "02-mappa", "03-lungomare", "04-centro", "05-mergellina", "06-vomero",
-         "07-porto", "08-fuorigrotta", "09-capodimonte", "10-vesuvio", "11-catturato", "12-alba"]
+SHEET = ["01-titolo", "02-mappa", "03-lungomare", "04-centro-gesu-nuovo", "05-mergellina-castel-dell-ovo",
+         "06-vomero-sant-elmo", "07-porto-maschio-angioino", "08-fuorigrotta-stadio", "09-capodimonte-reggia",
+         "10-villa-doria-d-angri", "11-scegli-la-forma", "12-pulcinella", "13-corsa-al-plebiscito",
+         "14-piazza-del-plebiscito", "16-parata"]
 
 with tempfile.TemporaryDirectory(prefix="spiriti-shots-") as temp:
     binary = Path(temp) / "harness"
@@ -35,7 +37,7 @@ for old in (OUT / "screens").glob("*.png"):
 for name, frame in frames.items():
     frame.resize((640, 400), Image.Resampling.NEAREST).quantize(colors=128, dither=Image.Dither.NONE).save(
         OUT / "screens" / f"{name}.png", optimize=True)
-sheet = Image.new("RGB", (3 * 320 + 4 * 4, 4 * 200 + 5 * 4), (8, 10, 30))
+sheet = Image.new("RGB", (3 * 320 + 4 * 4, 5 * 200 + 6 * 4), (8, 10, 30))
 for i, name in enumerate(SHEET):
     sheet.paste(frames[name], (4 + (i % 3) * 324, 4 + (i // 3) * 204))
 sheet.quantize(colors=220, dither=Image.Dither.NONE).save(OUT / "spiriti-napoli97-contact-sheet.png", optimize=True)

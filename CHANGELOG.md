@@ -1,5 +1,25 @@
 # Changelog
 
+## 3.0.0 — 2026-10-04 — Naples landmarks, Villa Doria d'Angri, the giant Pulcinella
+
+### New
+
+- **The drive.** Slime on the road is now cleaned by driving over it; spirits fly in over a lane, with a shadow on the road, and slime the car if it is under them. Puddles left behind and slime on the car raise the PK energy.
+- **Landmarks.** Each capture is fought in front of a Naples landmark: the Gesù Nuovo and the Guglia dell'Immacolata, Castel dell'Ovo and the Vesuvius, Castel Sant'Elmo and the Certosa di San Martino, the Maschio Angioino, the stadium at Fuorigrotta, the Reggia di Capodimonte.
+- **Villa Doria d'Angri.** The final call replaces the crater of the Vesuvius. The background is converted from a photograph of the villa. The guardian cannot be trapped: the hunter now moves, wears it down with the pack and dodges the fire it throws.
+- **"Scegli la forma del distruttore."** After the guardian, the message, then a giant evil Pulcinella rising over Piazza del Plebiscito.
+- **The run to the piazza** with a giant trap on the Fiat's roof, and **the fight in Piazza del Plebiscito**: rays from the car bind the giant, `B` opens the trap when he is bound and the car is under him, three times.
+- **The parade** on the lungomare: confetti, fireworks, dawn.
+- **Soundtrack.** Ten tracks: new ones for the omen, the giant (a dark tarantella) and the parade. The game sets the tracker's tempo while a track plays, so the music follows the car's speed, a spirit's patience and the rounds against the giant.
+- **Pictures.** Landmarks, the giant, the map, the logo and the far Vesuvius are stored as bands of runs and drawn as enlarged indexed rectangles (`picture()`), instead of tiles and bitmaps.
+- `tools/qemu_capture.py` now plays the whole game in the QEMU firmware by looking at the frames.
+
+### Changed
+
+- The building tiles, the crater scene and the bitmap logo, map and far Vesuvius are gone; 13 ground and lungomare tiles remain.
+- The Store icon is re-encoded with 32 colours and the metadata is shorter, to keep the package within 64 KiB.
+- The title line reads "Una notte. Sei quartieri. Un gigante."
+
 ## 2.0.0 — 2026-10-04 — indexed colours, palette effects, SID-like stereo
 
 ### Fixed

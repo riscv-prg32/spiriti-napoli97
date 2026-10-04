@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Compose the soundtrack of Spiriti! Napoli '97 and write audio.json.
 
-The AUDIO block holds ten SID-like procedural instruments and eight tracker
+The AUDIO block holds ten SID-like procedural instruments and ten tracker
 tracks and stores no PCM. Music plays on voices 0-3 (the tracker plays
 instrument N on voice N, panned by the instrument); the game keeps voices
 4-7 for the beam, the siren and the other effects, which it pans by screen
@@ -11,6 +11,9 @@ Tracker timing: `delta` is the wait *after* an event, in ticks (16th notes),
 so events with delta 0 sound together (PRG32 docs/tools/audio.md). Each track
 opens by setting the level and pan of its four voices, because the firmware
 keeps channel state from whatever played before.
+
+The game also changes the tempo while a track plays (with the road speed,
+as a spirit's patience runs out, round by round against the giant).
 
 Every tune is original. None quotes a film, television or game theme.
 """
@@ -73,8 +76,8 @@ def part(text, bar=16):
     return out
 
 
-def bars(*patterns):
-    return part(" | ".join(patterns))
+def bars(*patterns, bar=16):
+    return part(" | ".join(patterns), bar)
 
 
 def track(tempo, parts, loop=True, bar=16):
@@ -152,7 +155,7 @@ TRACKS = [
                 "C2 C2 C3 C2 C2 C2 C3 C2 G1 G1 G2 G1 G1 G1 G2 B2"),
         3: bars(*["C3:4 C4:4 C3:2 C3:2 C4:4"] * 4),
     }),
-    # 4 Cratere: the Vesuvius apparition, D phrygian
+    # 4 Guardiano: the apparition at Villa Doria d'Angri, D phrygian
     track(150, {
         0: bars("D5:4 Eb5:4 D5:4 C5:4", "D5:4 F5:4 Eb5:8", "A5:4 Bb5:4 A5:4 G5:4", "F5:2 Eb5:2 D5:4 Ab5:4 G5:4"),
         1: bars("r:2 A4:2 r:2 A4:2 r:2 A4:2 r:2 A4:2", "r:2 Bb4:2 r:2 Bb4:2 r:2 Bb4:2 r:2 Bb4:2",
@@ -171,14 +174,31 @@ TRACKS = [
         0: part("A4:2 G#4:2 G4:2 F#4:6", bar=12),
         2: part("A2:2 G#2:2 G2:2 F#2:6", bar=12),
     }, loop=False),
-    # 7 Alba: the city is safe, D major
-    track(120, {
-        0: bars("D5:2 F#5:2 A5:2 D6:2 B5:4 A5:4", "G5:2 B5:2 D6:2 G6:2 F#6:4 D6:4",
-                "E5:2 G5:2 B5:2 E6:2 D6:4 C#6:4", "D6:6 A5:2 D6:8"),
-        1: bars("r:2 A4:2 r:2 A4:2 r:2 B4:2 r:2 A4:2", "r:2 B4:2 r:2 B4:2 r:2 A4:2 r:2 A4:2",
-                "r:2 G4:2 r:2 G4:2 r:2 A4:2 r:2 A4:2", "r:2 F#4:2 r:2 F#4:2 r:2 F#4:2 r:2 A4:2"),
-        2: bars("D2:4 D3:4 B2:4 A2:4", "G2:4 G3:4 D3:4 D2:4", "E2:4 E3:4 A2:4 A3:4", "D2:4 A2:4 D3:8"),
-        3: bars(*["C3:2 C6:2 C4:2 C6:2 C3:2 C6:2 C4:2 C6:2"] * 4),
+    # 7 Parata: the parade on the lungomare, D major in 6/8 (one tick per quaver)
+    track(104, {
+        0: bars("F#5 A5 D6 F#6 D6 A5", "G5 B5 D6 G6 D6 B5", "E5 A5 C#6 E6 C#6 A5", "D6:2 F#6 A6:3",
+                "A5 D6 F#6 A6 F#6 D6", "B5 D6 G6 B6 G6 D6", "A5 C#6 E6 G6 E6 C#6", "D6:3 D6:3", bar=6),
+        1: bars(*["r A4 A4 r A4 A4", "r B4 B4 r B4 B4", "r A4 A4 r A4 A4", "r F#4 F#4 r A4 A4"] * 2, bar=6),
+        2: bars("D2:3 A2:3", "G2:3 D3:3", "A2:3 E3:3", "D3:3 A2:3", "D2:3 A2:3", "G2:3 D3:3", "A2:3 A2:3",
+                "D2:3 D3:3", bar=6),
+        3: bars(*["C3 C6 C6 C4 C6 C6"] * 8, bar=6),
+    }),
+    # 8 Presagio: "choose the form of the destructor", a tritone over a pedal
+    track(60, {
+        0: bars("r:8 Eb5:8", "r:4 A4:12", "r:8 Eb5:4 D5:4", "A4:16"),
+        1: bars("r:12 E6:4", "r:16", "r:12 Eb6:4", "r:16"),
+        2: bars("A1:16", "A1:16", "Bb1:16", "A1:16"),
+        3: bars(*["C2:16"] * 4),
+    }),
+    # 9 Distruttore: the giant in the piazza, a dark tarantella in A minor
+    track(118, {
+        0: bars("E5 E5 F5 E5 D5 C5", "D5 D5 E5 D5 C5 B4", "C5 B4 A4 G#4 A4 B4", "C5:2 E5 A5:3",
+                "A5 G#5 A5 B5 A5 G#5", "F5 E5 F5 G5 F5 E5", "D5 C5 B4 E5 D5 B4", "A4:3 r:3", bar=6),
+        1: bars("r E4 E4 r E4 E4", "r D4 D4 r D4 D4", "r E4 E4 r E4 E4", "r E4 E4 r E4 E4",
+                "r F4 F4 r F4 F4", "r F4 F4 r F4 F4", "r E4 E4 r G#4 G#4", "r E4 E4 r E4 E4", bar=6),
+        2: bars("A2:3 E3:3", "G2:3 D3:3", "A2:3 E2:3", "A2:3 E3:3", "F2:3 C3:3", "D2:3 A2:3", "E2:3 E3:3",
+                "A2:3 A2:3", bar=6),
+        3: bars(*["C3 C6 C6 C4 C6 C6"] * 8, bar=6),
     }),
 ]
 

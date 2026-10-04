@@ -3,13 +3,16 @@
 
 Everything the cartridge draws is palette-indexed:
 
-- the Fiat, the hunter, six spirits and the Vesuvius boss are converted from
-  the pixel-art sources in assets-src/ to 4-bpp sprites;
-- the districts are built from a bank of 16x16 4-bpp tiles drawn here pixel
-  by pixel. A tile pixel is a *role* (wall, window, water...), and each
-  district gives the roles its own 16 colours, so one bank serves them all;
-- props, the logo, the far Vesuvius and the dispatch-map coastline are drawn
-  here too.
+- the Fiat, the hunter, six spirits and the guardian of the villa are
+  converted from the pixel-art sources in assets-src/ to 4-bpp sprites;
+- the landmarks behind each capture are "pictures", stored as bands of runs
+  and drawn by game.c as enlarged indexed rectangles. Villa Doria d'Angri is
+  converted from a photograph in assets-src/; the others, the giant
+  Pulcinella, the logo, the far Vesuvius and the dispatch map are drawn here;
+- the ground and the lungomare are 16x16 4-bpp tiles drawn here pixel by
+  pixel. A tile pixel is a *role* (ground, water, metal...), and each scene
+  gives the roles its own colours;
+- props are drawn here too.
 
 The ESP32-C6 firmware stores one byte per pixel and maps every RGB565 colour
 to a cell of its 6x6x6 colour cube. The generator therefore gives every
@@ -25,7 +28,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "assets-src"
@@ -281,7 +284,13 @@ def make_props():
         d.polygon([(2, 3), (11, 3), (10, 9), (3, 9)], fill=7), d.rectangle((3, 3, 10, 4), fill=11),
         d.arc((9, 4, 14, 8), -90, 90, fill=7), d.rectangle((1, 10, 12, 11), fill=3), d.point([(5, 0), (7, 1), (8, 0)], fill=3),
         d.line((4, 6, 4, 8), fill=3)))
-    # Dispatch-map markers, one frame each: a haunted district and a cleared one.
+    # The oversized trap bolted to the Fiat's roof for the last call.
+    p["rooftrap"] = prop(36, 12, lambda d: (
+        d.rectangle((0, 4, 35, 10), fill=3), d.rectangle((0, 4, 35, 4), fill=7), d.rectangle((3, 1, 32, 3), fill=2),
+        [d.rectangle((x, 6, x + 2, 8), fill=4 if (x // 4) % 2 else 1) for x in range(4, 32, 4)],
+        d.rectangle((17, 1, 18, 3), fill=1), d.rectangle((0, 6, 1, 8), fill=5), d.rectangle((34, 6, 35, 8), fill=5),
+        d.rectangle((2, 10, 33, 11), fill=2), d.rectangle((6, 11, 8, 11), fill=1), d.rectangle((27, 11, 29, 11), fill=1)))
+    # Markers, one frame each: a spirit (on the map and over the road) and a cleared district.
     p["mark"] = np.concatenate([
         prop(16, 16, lambda d: (
             d.ellipse((3, 1, 12, 10), fill=7), d.rectangle((3, 6, 12, 12), fill=7),
@@ -296,7 +305,7 @@ def make_props():
 
 
 # --------------------------------------------------------------------------
-# Tiles: 16x16, a pixel is a role
+# Ground and lungomare tiles: 16x16, a pixel is a role
 # --------------------------------------------------------------------------
 (T_, OUT_, WD, WM, WL, A1, A2, WIN_D, WIN_L, GLOW, GD, GL, N1, N2, MET, HI) = range(16)
 ROLE_NAMES = ("key", "outline", "wall dark", "wall", "wall light", "accent 1", "accent 2", "window dark",
@@ -314,100 +323,6 @@ def R(t, x0, y0, x1, y1, c):
 def P(t, pts, c):
     for x, y in pts:
         t[y, x] = c
-
-
-def t_wall():
-    t = blank(WM)
-    R(t, 0, 15, 15, 15, WD)
-    P(t, [(3, 4), (4, 4), (11, 9), (12, 9), (13, 9), (6, 12), (1, 7)], WD)
-    P(t, [(8, 2), (9, 2), (2, 10), (3, 10), (13, 5), (14, 5)], WL)
-    return t
-
-
-def window(t, lit):
-    R(t, 3, 2, 12, 13, A1)
-    R(t, 4, 3, 11, 12, WIN_L if lit else WIN_D)
-    if lit:
-        R(t, 7, 3, 8, 12, A1)
-        R(t, 4, 7, 11, 7, A1)
-        P(t, [(5, 4), (9, 4), (5, 9), (9, 9)], GLOW)
-    else:
-        for y in range(4, 12, 2):
-            R(t, 4, y, 11, y, A1)
-        R(t, 7, 3, 8, 12, OUT_)
-    R(t, 2, 14, 13, 14, WL)
-    R(t, 2, 1, 13, 1, WL)
-    return t
-
-
-def t_balcony():
-    t = t_wall()
-    R(t, 4, 0, 11, 9, A1)
-    R(t, 5, 0, 10, 8, WIN_L)
-    R(t, 7, 0, 8, 8, A1)
-    R(t, 0, 9, 15, 9, HI)
-    for x in range(0, 16, 2):
-        R(t, x, 10, x, 13, MET)
-    for x in range(1, 16, 2):
-        R(t, x, 10, x, 13, OUT_)
-    R(t, 0, 14, 15, 15, WD)
-    P(t, [(1, 8), (2, 7), (13, 8), (14, 7), (12, 7)], A2)
-    P(t, [(1, 7), (3, 8), (14, 8), (13, 7)], N2)
-    return t
-
-
-def t_cornice():
-    t = blank()
-    for x in range(16):
-        t[4, x] = A2
-        t[5, x] = A2 if x % 4 else OUT_
-    R(t, 0, 6, 15, 7, WL)
-    R(t, 0, 8, 15, 8, WD)
-    R(t, 0, 9, 15, 15, WM)
-    for x in range(1, 16, 4):
-        R(t, x, 10, x + 1, 11, WD)
-    R(t, 0, 15, 15, 15, WD)
-    return t
-
-
-def t_door_top():
-    t = t_wall()
-    for y in range(16):
-        for x in range(16):
-            d = ((x - 7.5) ** 2 + (y - 15.5) ** 2) ** 0.5
-            if d < 6.2:
-                t[y, x] = OUT_
-            elif d < 8.2:
-                t[y, x] = WL if (x + y) % 3 else WD
-    R(t, 7, 6, 8, 8, HI)
-    P(t, [(6, 12), (9, 12), (7, 11), (8, 11)], WIN_D)
-    return t
-
-
-def t_door_bot():
-    t = t_wall()
-    R(t, 1, 0, 14, 13, WL)
-    R(t, 2, 0, 13, 13, A1)
-    R(t, 7, 0, 8, 13, OUT_)
-    for y in (3, 8):
-        R(t, 3, y, 6, y, OUT_)
-        R(t, 9, y, 12, y, OUT_)
-    P(t, [(6, 6), (9, 6)], GLOW)
-    R(t, 0, 14, 15, 15, GL)
-    R(t, 0, 15, 15, 15, GD)
-    return t
-
-
-def t_plinth():
-    t = blank(WD)
-    R(t, 0, 0, 15, 1, WL)
-    R(t, 0, 2, 15, 2, WM)
-    R(t, 0, 8, 15, 8, OUT_)
-    R(t, 0, 15, 15, 15, OUT_)
-    for x, y0, y1 in ((5, 3, 7), (13, 3, 7), (1, 9, 14), (9, 9, 14)):
-        R(t, x, y0, x, y1, OUT_)
-    P(t, [(2, 4), (8, 5), (4, 11), (12, 12)], WM)
-    return t
 
 
 def t_cobble():
@@ -473,71 +388,6 @@ def t_balustrade(pillar):
     return t
 
 
-def t_lattice():
-    t = blank()
-    R(t, 3, 0, 4, 15, MET)
-    R(t, 11, 0, 12, 15, MET)
-    for i in range(8):
-        t[i, 4 + i] = A1
-        t[i, 11 - i] = A1
-        t[8 + i, 4 + i] = A1
-        t[8 + i, 11 - i] = A1
-    R(t, 3, 0, 12, 0, A1)
-    R(t, 3, 8, 12, 8, A1)
-    return t
-
-
-def t_crate():
-    t = blank(A1)
-    R(t, 0, 0, 15, 0, OUT_)
-    R(t, 0, 15, 15, 15, OUT_)
-    R(t, 0, 0, 0, 15, OUT_)
-    R(t, 15, 0, 15, 15, OUT_)
-    R(t, 1, 1, 14, 2, WL)
-    R(t, 1, 13, 14, 14, WD)
-    for i in range(3, 13):
-        t[i, i] = WD
-        t[i, 15 - i] = WD
-    P(t, [(2, 4), (13, 4), (2, 11), (13, 11)], HI)
-    return t
-
-
-def t_container():
-    t = blank(A2)
-    for x in range(1, 15, 3):
-        R(t, x, 1, x, 14, OUT_)
-        R(t, x + 1, 1, x + 1, 14, WL)
-    R(t, 0, 0, 15, 0, OUT_)
-    R(t, 0, 15, 15, 15, OUT_)
-    R(t, 5, 5, 10, 9, HI)
-    R(t, 6, 6, 9, 8, A2)
-    return t
-
-
-def t_hull():
-    t = blank(WD)
-    R(t, 0, 0, 15, 1, HI)
-    R(t, 0, 2, 15, 2, MET)
-    R(t, 0, 11, 15, 13, A2)
-    R(t, 0, 14, 15, 15, OUT_)
-    P(t, [(2, 5), (7, 5), (12, 5), (4, 8), (9, 8), (14, 8)], MET)
-    return t
-
-
-def t_cabin():
-    t = blank()
-    R(t, 0, 4, 15, 4, MET)
-    for x in (2, 8, 14):
-        R(t, x, 4, x, 7, MET)
-    R(t, 0, 8, 15, 15, WL)
-    R(t, 0, 8, 15, 8, HI)
-    R(t, 0, 15, 15, 15, OUT_)
-    for x in (2, 7, 12):
-        R(t, x, 10, x + 2, 12, WIN_L)
-        t[10, x] = GLOW
-    return t
-
-
 def t_quay():
     t = blank(GD)
     R(t, 0, 0, 15, 0, HI)
@@ -549,176 +399,6 @@ def t_quay():
     return t
 
 
-def t_panel():
-    t = blank(WM)
-    R(t, 1, 1, 14, 14, WD)
-    R(t, 2, 2, 13, 13, WL)
-    R(t, 3, 3, 12, 12, WM)
-    R(t, 3, 12, 12, 12, WD)
-    R(t, 12, 3, 12, 12, WD)
-    R(t, 6, 6, 9, 9, WL)
-    R(t, 7, 7, 8, 8, GLOW)
-    return t
-
-
-def t_column(capital):
-    t = blank(WD)
-    R(t, 3, 0, 12, 15, WM)
-    for x in (4, 7, 10):
-        R(t, x, 0, x, 15, WL)
-    R(t, 12, 0, 12, 15, OUT_)
-    if capital:
-        R(t, 0, 0, 15, 3, WM)
-        R(t, 0, 0, 15, 0, HI)
-        R(t, 0, 3, 15, 3, OUT_)
-        R(t, 1, 4, 14, 7, WL)
-        R(t, 1, 7, 14, 7, WD)
-        P(t, [(2, 5), (3, 5), (12, 5), (13, 5), (7, 5), (8, 5)], GLOW)
-    return t
-
-
-def t_curtain(swag):
-    t = blank(A2)
-    for x in range(16):
-        if x % 4 == 0:
-            R(t, x, 0, x, 15, A1)
-        if x % 4 == 1:
-            R(t, x, 0, x, 15, OUT_)
-        if x % 4 == 3:
-            R(t, x, 0, x, 15, HI if swag else A2)
-    if swag:
-        t[:] = A2
-        R(t, 0, 0, 15, 1, GLOW)
-        R(t, 0, 2, 15, 2, OUT_)
-        for x in range(16):
-            depth = 7 + int(4 * abs(((x % 8) - 3.5) / 3.5) ** 1.5)
-            R(t, x, depth, x, 15, T_)
-            t[depth - 1, x] = GLOW
-            if x % 2:
-                t[depth, x] = GLOW
-        for x in (2, 5, 10, 13):
-            R(t, x, 3, x, 6, A1)
-        t[t == T_] = WD
-    return t
-
-
-def t_portrait():
-    t = t_panel()
-    R(t, 2, 1, 13, 14, GLOW)
-    R(t, 3, 2, 12, 13, OUT_)
-    R(t, 6, 4, 9, 8, WL)
-    R(t, 5, 9, 10, 13, MET)
-    R(t, 7, 9, 8, 10, WL)
-    P(t, [(6, 6), (9, 6)], WIN_L)
-    P(t, [(7, 8), (8, 8)], WD)
-    R(t, 6, 3, 9, 3, WD)
-    return t
-
-
-def t_parquet():
-    t = blank(GD)
-    for y in range(16):
-        for x in range(16):
-            if (x + y) % 8 == 0 and (x // 8 + y // 8) % 2 == 0:
-                t[y, x] = GL
-            if (x - y) % 8 == 0 and (x // 8 + y // 8) % 2 == 1:
-                t[y, x] = GL
-    R(t, 0, 0, 15, 0, GL)
-    return t
-
-
-def t_chandelier():
-    t = blank()
-    R(t, 7, 0, 8, 6, MET)
-    R(t, 2, 9, 13, 9, GLOW)
-    R(t, 4, 7, 11, 7, GLOW)
-    R(t, 6, 6, 9, 10, GLOW)
-    P(t, [(7, 11), (8, 11), (7, 12)], GLOW)
-    for x in (2, 5, 10, 13):
-        R(t, x, 6, x, 8, HI)
-        t[5, x] = WIN_L
-        t[4, x] = GLOW
-    return t
-
-
-def t_tuff():
-    t = blank(WM)
-    R(t, 0, 7, 15, 7, WD)
-    R(t, 0, 15, 15, 15, WD)
-    R(t, 5, 0, 5, 6, WD)
-    R(t, 12, 8, 12, 14, WD)
-    R(t, 0, 8, 0, 14, WD)
-    P(t, [(1, 1), (2, 1), (7, 2), (8, 9), (9, 9), (14, 10), (10, 3)], WL)
-    P(t, [(3, 4), (9, 5), (4, 11), (6, 12), (14, 2)], OUT_)
-    return t
-
-
-def t_dark():
-    t = blank(OUT_)
-    P(t, [(2, 3), (9, 6), (13, 12), (5, 13), (11, 1)], WD)
-    return t
-
-
-def t_arch(right):
-    t = t_tuff()
-    for y in range(16):
-        for x in range(16):
-            d = ((x - 15.5) ** 2 + (y - 15.5) ** 2) ** 0.5
-            if d < 13.2:
-                t[y, x] = OUT_
-            elif d < 15.4:
-                t[y, x] = WL if (x * 2 + y) % 5 else WD
-    return t[:, ::-1].copy() if right else t
-
-
-def t_niche():
-    t = t_dark()
-    for y in range(16):
-        for x in range(16):
-            d = ((x - 7.5) ** 2 + (y - 6) ** 2) ** 0.5
-            if 3.2 < d < 5.2:
-                t[y, x] = WD
-    R(t, 7, 8, 8, 13, HI)
-    R(t, 7, 5, 8, 7, GLOW)
-    P(t, [(7, 4), (8, 3)], WIN_L)
-    P(t, [(7, 6)], HI)
-    R(t, 5, 14, 10, 15, MET)
-    return t
-
-
-def t_skulls():
-    t = t_dark()
-    for cx in (3, 10):
-        R(t, cx, 5, cx + 4, 9, HI)
-        P(t, [(cx, 5), (cx + 4, 5)], OUT_)
-        P(t, [(cx + 1, 7), (cx + 3, 7)], OUT_)
-        R(t, cx + 1, 10, cx + 3, 11, MET)
-        P(t, [(cx + 2, 9)], OUT_)
-    R(t, 0, 12, 15, 13, WM)
-    R(t, 0, 14, 15, 15, WD)
-    return t
-
-
-def t_statue(top):
-    t = t_dark()
-    if top:
-        R(t, 6, 6, 9, 11, MET)
-        R(t, 6, 6, 7, 10, HI)
-        R(t, 5, 5, 10, 6, WD)
-        R(t, 4, 12, 11, 15, MET)
-        R(t, 4, 12, 5, 15, HI)
-        P(t, [(7, 8), (9, 8)], OUT_)
-    else:
-        R(t, 4, 0, 11, 10, MET)
-        for x in (5, 8, 10):
-            R(t, x, 0, x, 10, HI if x == 5 else WD)
-        R(t, 2, 6, 4, 8, MET)
-        R(t, 2, 11, 13, 15, WM)
-        R(t, 2, 11, 13, 11, WL)
-        R(t, 2, 15, 13, 15, WD)
-    return t
-
-
 def t_flag():
     t = blank(GD)
     R(t, 0, 0, 15, 0, GL)
@@ -726,60 +406,6 @@ def t_flag():
     R(t, 4, 1, 4, 7, GL)
     R(t, 12, 9, 12, 15, GL)
     P(t, [(8, 4), (9, 4), (2, 12), (14, 3)], OUT_)
-    return t
-
-
-def t_stand():
-    t = blank(WD)
-    spots = [(1, 1, A2), (4, 2, HI), (7, 1, WIN_L), (10, 2, A2), (13, 1, HI), (2, 6, HI), (6, 5, A2), (9, 6, WIN_L),
-             (12, 5, HI), (15, 6, A2), (0, 10, WIN_L), (3, 9, A2), (8, 10, HI), (11, 9, A2), (14, 10, WIN_L),
-             (1, 14, A2), (5, 13, HI), (10, 14, A2), (13, 13, HI)]
-    for y in (3, 7, 11, 15):
-        R(t, 0, y, 15, y, WM)
-    for x, y, c in spots:
-        t[y, x] = c
-    return t
-
-
-def t_flood(pole):
-    t = blank()
-    R(t, 7, 0, 8, 15, MET)
-    if not pole:
-        R(t, 1, 2, 14, 10, MET)
-        R(t, 1, 2, 14, 2, HI)
-        for y in (4, 7):
-            for x in (3, 6, 9, 12):
-                R(t, x, y, x + 1, y + 1, GLOW)
-                t[y, x] = HI
-    else:
-        P(t, [(6, 4), (9, 4), (6, 12), (9, 12)], MET)
-    return t
-
-
-def t_fence():
-    t = blank()
-    R(t, 0, 0, 15, 0, HI)
-    R(t, 0, 15, 15, 15, MET)
-    for i in range(16):
-        if i % 4 == 0:
-            R(t, i, 1, i, 14, MET)
-        for j in range(1, 15):
-            if (i + j) % 4 == 0 and (i - j) % 2 == 0:
-                t[j, i] = MET
-    return t
-
-
-def t_rock(rim):
-    t = blank(WD)
-    P(t, [(1, 2), (2, 2), (2, 3), (9, 5), (10, 5), (10, 6), (4, 10), (5, 10), (13, 12), (14, 12)], WM)
-    P(t, [(1, 1), (9, 4), (4, 9), (13, 11)], WL)
-    P(t, [(6, 1), (6, 2), (7, 3), (12, 8), (11, 9), (11, 10), (2, 13), (3, 14)], OUT_)
-    P(t, [(7, 4), (8, 5), (12, 9), (3, 15)], GLOW)
-    if rim:
-        heights = (9, 7, 6, 8, 5, 3, 4, 6, 8, 7, 4, 2, 3, 6, 8, 10)
-        for x, top in enumerate(heights):
-            R(t, x, 0, x, top - 1, T_)
-            t[top, x] = WL
     return t
 
 
@@ -804,171 +430,360 @@ def t_moon():
 
 
 TILES = [
-    ("WALL", t_wall()), ("WIN_LIT", window(t_wall(), True)), ("WIN_DARK", window(t_wall(), False)),
-    ("BALCONY", t_balcony()), ("CORNICE", t_cornice()), ("DOOR_TOP", t_door_top()), ("DOOR_BOT", t_door_bot()),
-    ("PLINTH", t_plinth()), ("COBBLE", t_cobble()), ("KERB", t_kerb()), ("WATER", t_water(0)), ("WATER_B", t_water(1)),
+    ("COBBLE", t_cobble()), ("KERB", t_kerb()), ("WATER", t_water(0)), ("WATER_B", t_water(1)),
     ("SHORE", t_shore()), ("BALUSTRADE", t_balustrade(False)), ("PILLAR", t_balustrade(True)),
-    ("LATTICE", t_lattice()), ("JIB", t_lattice().T.copy()), ("CRATE", t_crate()), ("CONTAINER", t_container()),
-    ("HULL", t_hull()), ("CABIN", t_cabin()), ("QUAY", t_quay()), ("PANEL", t_panel()),
-    ("COLUMN", t_column(False)), ("CAPITAL", t_column(True)), ("CURTAIN", t_curtain(False)), ("SWAG", t_curtain(True)),
-    ("PORTRAIT", t_portrait()), ("PARQUET", t_parquet()), ("CHANDELIER", t_chandelier()), ("TUFF", t_tuff()),
-    ("DARK", t_dark()), ("ARCH_L", t_arch(False)), ("ARCH_R", t_arch(True)), ("NICHE", t_niche()),
-    ("SKULLS", t_skulls()), ("STATUE_T", t_statue(True)), ("STATUE_B", t_statue(False)), ("FLAG", t_flag()),
-    ("STAND", t_stand()), ("FLOOD", t_flood(False)), ("POLE", t_flood(True)), ("FENCE", t_fence()),
-    ("ROCK", t_rock(False)), ("RIM", t_rock(True)), ("ASPHALT", t_asphalt(0)), ("DASH", t_asphalt(1)),
+    ("QUAY", t_quay()), ("FLAG", t_flag()), ("ASPHALT", t_asphalt(0)), ("DASH", t_asphalt(1)),
     ("EDGE", t_asphalt(2)), ("MOON", t_moon()),
 ]
 TILE_CODE = {name: i + 1 for i, (name, _) in enumerate(TILES)}       # 0 = nothing
+CHARS = {".": 0, "o": "COBBLE", "k": "KERB", "~": "WATER", "s": "SHORE", "=": "BALUSTRADE", "I": "PILLAR",
+         "q": "QUAY", "f": "FLAG", "a": "ASPHALT", "_": "DASH", "e": "EDGE", "O": "MOON"}
 
-CHARS = {
-    ".": 0, "W": "WALL", "l": "WIN_LIT", "d": "WIN_DARK", "b": "BALCONY", "c": "CORNICE", "A": "DOOR_TOP",
-    "D": "DOOR_BOT", "p": "PLINTH", "o": "COBBLE", "k": "KERB", "~": "WATER", "s": "SHORE", "=": "BALUSTRADE",
-    "I": "PILLAR", "#": "LATTICE", "-": "JIB", "x": "CRATE", "C": "CONTAINER", "H": "HULL", "h": "CABIN",
-    "q": "QUAY", "P": "PANEL", "|": "COLUMN", "T": "CAPITAL", "U": "CURTAIN", "S": "SWAG", "R": "PORTRAIT",
-    "/": "PARQUET", "*": "CHANDELIER", "t": "TUFF", " ": "DARK", "(": "ARCH_L", ")": "ARCH_R", "n": "NICHE",
-    "u": "SKULLS", "1": "STATUE_T", "2": "STATUE_B", "f": "FLAG", "g": "STAND", "F": "FLOOD", "i": "POLE",
-    "+": "FENCE", "r": "ROCK", "^": "RIM", "a": "ASPHALT", "_": "DASH", "e": "EDGE", "O": "MOON",
-}
-
-# --------------------------------------------------------------------------
-# Districts: 20x10 maps and one palette each
-# --------------------------------------------------------------------------
-SCENES = [
-    # 0 Centro Storico: stucco palazzi and an alley of lit windows
-    dict(name="CENTRO", ghosts=("ghost0",), far=False, rows=[
-        "....................",
-        "ccccccc.cccccc.ccccc",
-        "WlWdWlW.WdWlWW.WlWdW",
-        "WbWWWbW.WbWWbW.WWbWW",
-        "WWdWlWW.WWlWdW.WdWlW",
-        "WlWWWdW.WdWWWW.WWWWW",
-        "WWAWWWW.WWWAWW.WAWWl",
-        "ppDppppkpppDppkpDppp",
-        "kkkkkkkkkkkkkkkkkkkk",
-        "oooooooooooooooooooo"],
-         pal=[(18, 14, 26), (92, 56, 44), (176, 112, 72), (224, 168, 110), (44, 92, 84), (188, 72, 60),
-              (30, 34, 58), (255, 214, 120), (255, 244, 190), (58, 56, 70), (104, 100, 112), (36, 96, 60),
-              (120, 190, 96), (120, 124, 140), (246, 236, 214)],
-         sky=((8, 10, 40), (62, 44, 96)), far_pal=[(40, 36, 70), (70, 60, 100), (255, 120, 60)]),
-    # 1 Mergellina: the lungomare, the bay and the Vesuvius
-    dict(name="MERGELLINA", ghosts=("ghost0", "ghost1"), far=True, rows=[
-        "................O...",
-        "....................",
-        "....................",
-        "....................",
-        "ssssssssssssssssssss",
-        "~~~~~~~~~~~~~~~~~~~~",
-        "~~~~~~~~~~~~~~~~~~~~",
-        "I===I===I===I===I===",
-        "kkkkkkkkkkkkkkkkkkkk",
-        "oooooooooooooooooooo"],
-         pal=[(10, 12, 30), (60, 62, 96), (110, 114, 150), (170, 176, 204), (150, 96, 50), (214, 92, 70),
-              (24, 30, 64), (255, 208, 110), (255, 240, 180), (60, 58, 80), (112, 108, 128), (10, 58, 124),
-              (56, 122, 200), (150, 156, 176), (236, 240, 250)],
-         sky=((6, 10, 44), (40, 60, 130)), far_pal=[(44, 44, 96), (80, 70, 130), (255, 110, 50)]),
-    # 2 Vomero: a haunted palazzo interior, gold panels and red curtains
-    dict(name="VOMERO", ghosts=("ghost3",), far=False, rows=[
-        "SSSSSSSSSSSSSSSSSSSS",
-        "UTPP*PPTUUTPP*PPTUPP",
-        "U|PRPPR|UU|PRPPR|UPR",
-        "U|PPPPP|UU|PPPPP|UPP",
-        "U|PRPPR|UU|PRPPR|UPR",
-        "U|PPPPP|UU|PPPPP|UPP",
-        "U|PPPPP|UU|PPPPP|UPP",
-        "pppppppppppppppppppp",
-        "////////////////////",
-        "////////////////////"],
-         pal=[(22, 10, 14), (96, 60, 20), (170, 118, 34), (226, 178, 70), (112, 16, 28), (178, 30, 40),
-              (40, 26, 30), (120, 230, 255), (255, 226, 130), (74, 40, 26), (128, 78, 42), (30, 60, 50),
-              (90, 140, 100), (150, 140, 130), (255, 240, 200)],
-         sky=((30, 10, 20), (60, 20, 30)), far_pal=[(40, 20, 30), (70, 40, 50), (255, 120, 60)]),
-    # 3 Porto: cranes, containers and a liner at the quay
-    dict(name="PORTO", ghosts=("ghost2",), far=False, rows=[
-        "..O.................",
-        ".------.............",
-        ".#...............hh.",
-        ".#..........hhhhhhh.",
-        ".#.......HHHHHHHHHHH",
-        ".#..CC...HHHHHHHHHHH",
-        ".#.xCCx.~~~~~~~~~~~~",
-        "x#xxCCxx~~~~~~~~~~~~",
-        "qqqqqqqqqqqqqqqqqqqq",
-        "oooooooooooooooooooo"],
-         pal=[(8, 12, 26), (26, 40, 84), (60, 80, 130), (210, 216, 230), (222, 120, 40), (186, 50, 54),
-              (20, 26, 50), (255, 220, 120), (255, 246, 200), (52, 56, 70), (98, 104, 120), (10, 36, 90),
-              (40, 100, 170), (128, 136, 152), (240, 244, 252)],
-         sky=((4, 8, 36), (30, 50, 110)), far_pal=[(30, 34, 80), (60, 60, 110), (255, 110, 50)]),
-    # 4 Fuorigrotta: the stadium under its floodlights
-    dict(name="FUORIGROTTA", ghosts=("ghost4",), far=False, rows=[
-        "..F..............F..",
-        "..i..............i..",
-        "..i.cccccccccccc.i..",
-        "..icgggggggggggggci.",
-        ".cgggggggggggggggggc",
-        "cggggggggggggggggggg",
-        "WAWWAWWAWWAWWAWWAWWA",
-        "p+p++p++p++p++p++p++",
-        "kkkkkkkkkkkkkkkkkkkk",
-        "oooooooooooooooooooo"],
-         pal=[(12, 14, 28), (48, 60, 86), (96, 112, 140), (150, 168, 196), (40, 110, 190), (90, 170, 240),
-              (24, 28, 52), (255, 236, 150), (255, 252, 220), (54, 58, 66), (100, 106, 116), (30, 90, 60),
-              (110, 180, 100), (136, 146, 164), (240, 246, 255)],
-         sky=((6, 12, 44), (50, 70, 120)), far_pal=[(30, 34, 80), (60, 60, 110), (255, 110, 50)]),
-    # 5 Capodimonte: tuff catacombs, candles and skulls
-    dict(name="CAPODIMONTE", ghosts=("ghost5",), far=False, rows=[
-        "tttttttttttttttttttt",
-        "t()tt()tt()tt()tt()t",
-        "t  tt  tt  tt  tt  t",
-        "t1 ttn tt 1ttn tt1 t",
-        "t2 ttu tt 2ttu tt2 t",
-        "tttttttttttttttttttt",
-        "tnttuuttnttuuttnttut",
-        "pppppppppppppppppppp",
-        "ffffffffffffffffffff",
-        "ffffffffffffffffffff"],
-         pal=[(14, 10, 12), (70, 50, 36), (122, 92, 60), (170, 136, 90), (90, 60, 30), (140, 40, 30),
-              (30, 20, 24), (255, 150, 50), (255, 226, 120), (40, 34, 34), (78, 66, 60), (30, 50, 40),
-              (80, 110, 80), (128, 122, 116), (232, 222, 200)],
-         sky=((20, 12, 10), (40, 24, 16)), far_pal=[(40, 20, 30), (70, 40, 50), (255, 120, 60)]),
-    # 6 Vesuvio: the crater, where the last apparition waits
-    dict(name="VESUVIO", ghosts=("boss",), far=False, rows=[
-        "....................",
-        "....................",
-        "^..................^",
-        "r^^..............^^r",
-        "rrr^............^rrr",
-        "rrrr^^........^^rrrr",
-        "rrrrrr^^^^^^^^rrrrrr",
-        "rrrr~~~~~~~~~~~~rrrr",
-        "^^^^^^^^^^^^^^^^^^^^",
-        "rrrrrrrrrrrrrrrrrrrr"],
-         pal=[(14, 12, 22), (40, 42, 60), (72, 74, 98), (112, 112, 136), (120, 40, 20), (200, 60, 30),
-              (30, 14, 20), (255, 140, 40), (255, 210, 80), (40, 20, 24), (80, 40, 40), (196, 36, 10),
-              (255, 150, 30), (120, 100, 100), (255, 236, 170)],
-         sky=((36, 6, 26), (176, 52, 20)), far_pal=[(40, 20, 30), (70, 40, 50), (255, 120, 60)]),
-]
+# The lungomare: the title and the endings (SHORE_ROWS) and the drive (ROAD_ROWS).
 SCENE_COLS, SCENE_ROWS = 20, 10
-
-# The drive along the lungomare uses the Mergellina palette.
+SHORE_ROWS = ["................O...", "....................", "....................", "....................",
+              "ssssssssssssssssssss", "~~~~~~~~~~~~~~~~~~~~", "~~~~~~~~~~~~~~~~~~~~", "I===I===I===I===I===",
+              "kkkkkkkkkkkkkkkkkkkk", "oooooooooooooooooooo"]
 ROAD_ROWS = ["................O...", "....................", "....................", "ssssssssssssssssssss",
              "~~~~~~~~~~~~~~~~~~~~", "I===I===I===I===I===", "kkkkkkkkkkkkkkkkkkkk", "eeeeeeeeeeeeeeeeeeee",
              "____________________", "____________________"]
 
-# Interface colours that are drawn as RGB565 (text backgrounds) and so need a cell.
-UI_NAVY = rgb565((10, 16, 52))
-
 
 # --------------------------------------------------------------------------
-# Far Vesuvius, logo and the dispatch map
+# Pictures: role-indexed images stored as bands of runs and drawn enlarged
 # --------------------------------------------------------------------------
-def make_far():
-    """96x32, 2 bpp: the two-peaked Vesuvius seen across the bay."""
-    im = Image.new("P", (96, 32), 0)
+def encode_picture(a):
+    """Rows that repeat are stored once: [rows][runs...]... 0.
+
+    A run is one byte, colour in the high nibble and length-1 in the low one;
+    a low nibble of 15 means the length follows in the next byte. Colour 0 is
+    not drawn. Buildings are mostly columns and courses, so this is far
+    smaller than a bitmap, and game.c draws each run as one rectangle.
+    """
+    a = np.asarray(a, dtype=np.uint8)
+    h, w = a.shape
+    out = []
+    y = 0
+    while y < h:
+        rep = 1
+        while y + rep < h and rep < 255 and (a[y + rep] == a[y]).all():
+            rep += 1
+        out.append(rep)
+        x = 0
+        while x < w:
+            c = int(a[y, x])
+            n = 1
+            while x + n < w and a[y, x + n] == c and n < 255:
+                n += 1
+            out += [(c << 4) | (n - 1)] if n <= 15 else [(c << 4) | 15, n]
+            x += n
+        y += rep
+    return out + [0]
+
+
+PIC_W = 160
+
+
+def canvas(h=64):
+    im = Image.new("P", (PIC_W, h), 0)
+    return im, ImageDraw.Draw(im)
+
+
+def pic_centro():
+    """Piazza del Gesu Nuovo: the diamond-point facade of the church and the Guglia dell'Immacolata."""
+    im, d = canvas()
+    d.rectangle((0, 20, 20, 63), fill=A1)                      # Palazzo Pignatelli side
+    d.rectangle((0, 18, 21, 19), fill=WL)
+    for y in (24, 36, 48):
+        for x in (3, 12):
+            d.rectangle((x, y, x + 4, y + 7), fill=WIN_L if (x + y) % 5 == 0 else WIN_D)
+    d.rectangle((26, 12, 128, 63), fill=WD)                    # piperno facade
+    d.rectangle((24, 10, 130, 11), fill=WM)
+    for y in range(16, 62, 4):                                 # the diamond-point ashlar
+        for x in range(28 + (y // 4 % 2) * 4, 127, 8):
+            d.rectangle((x, y, x + 1, y + 1), fill=WM)
+    d.rectangle((62, 30, 92, 63), fill=WL)                     # marble portal
+    d.polygon([(60, 30), (77, 21), (94, 30)], fill=WL)
+    d.rectangle((64, 30, 66, 63), fill=HI)
+    d.rectangle((88, 30, 90, 63), fill=HI)
+    d.rectangle((70, 38, 84, 63), fill=A2)
+    d.rectangle((77, 38, 77, 63), fill=OUT_)
+    d.rectangle((70, 36, 84, 37), fill=MET)
+    for x in (36, 104):                                        # side portals
+        d.rectangle((x, 42, x + 14, 63), fill=WL)
+        d.rectangle((x + 3, 47, x + 11, 63), fill=A2)
+        d.rectangle((x - 1, 40, x + 15, 41), fill=HI)
+        d.rectangle((x + 2, 22, x + 12, 34), fill=WL)          # windows above
+        d.rectangle((x + 4, 24, x + 10, 33), fill=WIN_D)
+    d.rectangle((70, 13, 84, 19), fill=WL)
+    d.rectangle((72, 14, 82, 19), fill=WIN_L)
+    for y in range(4, 64):                                     # the spire
+        half = 1 + (y - 4) // 11 + (5 if y > 54 else 0)
+        d.rectangle((146 - half, y, 146 + half, y), fill=WL)
+        d.point((146 - half, y), fill=HI)
+    for y in (16, 28, 40, 52):
+        d.rectangle((146 - 2 - y // 11, y, 146 + 2 + y // 11, y + 1), fill=MET)
+    d.rectangle((145, 0, 147, 3), fill=GLOW)
+    return im
+
+
+def pic_mergellina():
+    """The bay from Mergellina: Castel dell'Ovo on its islet and the Vesuvius across the water."""
+    im, d = canvas(56)
+    d.polygon([(64, 36), (92, 24), (104, 15), (110, 18), (116, 12), (124, 15), (150, 32), (159, 36)], fill=WD)
+    d.polygon([(110, 18), (116, 12), (124, 15), (150, 32), (159, 36), (130, 36)], fill=WM)
+    d.point([(117, 11), (118, 10), (116, 13)], fill=A2)
+    d.rectangle((0, 36, 159, 37), fill=OUT_)
+    for x in (72, 80, 91, 99, 108, 121, 133, 140, 152):
+        d.point((x, 36 + x % 2), fill=WIN_L)
+    d.rectangle((0, 38, 159, 55), fill=N1)
+    for x, y in ((84, 41), (120, 44), (96, 49), (140, 51), (70, 53), (30, 54)):
+        d.rectangle((x, y, x + 5, y), fill=N2)
+    d.polygon([(4, 46), (72, 46), (76, 50), (0, 50)], fill=OUT_)        # the islet of Megaride
+    d.rectangle((8, 34, 68, 46), fill=A1)
+    d.rectangle((8, 34, 68, 34), fill=WL)
+    d.rectangle((14, 27, 46, 34), fill=WL)
+    d.rectangle((22, 21, 38, 27), fill=A1)
+    d.rectangle((22, 21, 38, 21), fill=WL)
+    d.rectangle((50, 29, 64, 34), fill=A1)
+    for x in (12, 20, 28, 36, 44, 52, 60):
+        d.rectangle((x, 38, x + 1, 40), fill=WIN_L if x % 3 == 0 else OUT_)
+    for x in (18, 26, 34, 42):
+        d.point((x, 30), fill=OUT_)
+    d.rectangle((68, 44, 96, 45), fill=MET)                             # the causeway
+    return im
+
+
+def pic_vomero():
+    """The Vomero hill: Castel Sant'Elmo above the Certosa di San Martino."""
+    im, d = canvas()
+    d.polygon([(0, 34), (24, 24), (136, 22), (159, 30), (159, 63), (0, 63)], fill=N1)
+    d.polygon([(22, 24), (30, 6), (124, 6), (134, 24)], fill=WM)        # the star fort
+    d.polygon([(96, 6), (124, 6), (134, 24), (104, 24)], fill=WD)
+    d.polygon([(40, 24), (48, 10), (66, 10), (72, 24)], fill=WL)
+    d.rectangle((30, 6, 124, 6), fill=HI)
+    for x in (36, 58, 82, 112):
+        d.rectangle((x, 12, x + 1, 14), fill=OUT_)
+    d.rectangle((58, 28, 152, 40), fill=HI)                             # the Certosa
+    d.rectangle((56, 26, 154, 27), fill=A2)
+    for x in range(62, 150, 7):
+        d.rectangle((x, 31, x + 3, 37), fill=WIN_D)
+        d.point([(x, 31), (x + 3, 31)], fill=HI)
+    d.ellipse((132, 16, 144, 28), fill=MET)
+    d.rectangle((137, 13, 138, 16), fill=HI)
+    palette = (A1, A2, WL, A1, WL, A2, A1, WL)
+    for i, x in enumerate(range(2, 156, 20)):                           # houses down the slope
+        top = 44 + (i * 5) % 9
+        d.rectangle((x, top, x + 17, 63), fill=palette[i])
+        d.rectangle((x, top, x + 17, top), fill=A2 if palette[i] != A2 else WD)
+        for wy in range(top + 4, 60, 7):
+            for wx in (x + 3, x + 10):
+                d.rectangle((wx, wy, wx + 3, wy + 3), fill=WIN_L if (wx + wy + i) % 3 == 0 else WIN_D)
+    for x, y in ((8, 36), (30, 38), (48, 34), (150, 42)):
+        d.ellipse((x, y, x + 8, y + 6), fill=N2)
+    return im
+
+
+def pic_porto():
+    """Castel Nuovo, the Maschio Angioino: round piperno towers and the marble triumphal arch."""
+    im, d = canvas()
+    d.rectangle((128, 50, 159, 63), fill=N1)
+    d.rectangle((132, 44, 159, 49), fill=OUT_)                          # a ferry at the Molo Beverello
+    d.rectangle((140, 38, 156, 43), fill=HI)
+    for x in (142, 147, 152):
+        d.point((x, 40), fill=WIN_L)
+    d.rectangle((30, 26, 116, 63), fill=WM)                             # curtain walls
+    for x in range(30, 116, 6):
+        d.rectangle((x, 23, x + 2, 25), fill=WM)
+    for x in (40, 50, 60):
+        d.rectangle((x, 36, x + 2, 42), fill=WIN_D)
+    for cx in (20, 76, 118):
+        d.rectangle((cx - 10, 12, cx + 10, 63), fill=WD)
+        d.rectangle((cx - 7, 12, cx - 5, 63), fill=WM)
+        d.rectangle((cx + 7, 12, cx + 10, 63), fill=OUT_)
+        d.rectangle((cx - 12, 8, cx + 12, 13), fill=WD)
+        d.rectangle((cx - 12, 13, cx + 12, 13), fill=OUT_)
+        for x in range(cx - 12, cx + 12, 5):
+            d.rectangle((x, 5, x + 2, 7), fill=WD)
+        d.polygon([(cx - 10, 52), (cx - 14, 63), (cx + 14, 63), (cx + 10, 52)], fill=WD)
+        d.rectangle((cx - 1, 24, cx, 28), fill=OUT_)
+    d.rectangle((87, 16, 107, 63), fill=HI)                             # the arch of Alfonso of Aragon
+    d.rectangle((91, 44, 103, 63), fill=OUT_)
+    d.rectangle((93, 42, 101, 43), fill=OUT_)
+    d.rectangle((91, 26, 103, 36), fill=WIN_D)
+    d.rectangle((93, 24, 101, 25), fill=WIN_D)
+    for y in (20, 38):
+        d.rectangle((87, y, 107, y + 1), fill=MET)
+    d.polygon([(87, 16), (97, 10), (107, 16)], fill=HI)
+    return im
+
+
+def pic_fuorigrotta():
+    """The stadium at Fuorigrotta: the concrete bowl under its steel roof and floodlights."""
+    im, d = canvas()
+    d.ellipse((2, 20, 157, 120), fill=WL)
+    d.rectangle((2, 44, 157, 63), fill=WM)
+    d.rectangle((2, 42, 157, 43), fill=OUT_)
+    for x in range(6, 156, 8):
+        d.rectangle((x, 44, x, 63), fill=WD)
+    for x in range(10, 152, 16):
+        d.rectangle((x, 54, x + 5, 63), fill=OUT_)
+    d.arc((2, 12, 157, 112), 184, 356, fill=A1, width=3)                # the roof ring
+    for x in (22, 50, 80, 108, 137):
+        top = 22 - int(10 * (1 - ((x - 80) / 80) ** 2))
+        d.rectangle((x, top + 4, x + 1, top + 20), fill=MET)
+        d.rectangle((x - 3, top + 2, x + 4, top + 4), fill=A1)
+    for x in (14, 144):
+        d.rectangle((x, 6, x + 1, 30), fill=MET)
+        d.rectangle((x - 3, 2, x + 4, 7), fill=MET)
+        d.point([(x - 2, 3), (x, 3), (x + 2, 3), (x - 2, 5), (x, 5), (x + 2, 5)], fill=GLOW)
+    for i, x in enumerate(range(20, 140, 3)):
+        d.point((x, 34 + (i * 7) % 5), fill=(A2, HI, WIN_L, A1)[i % 4])  # the crowd
+    d.rectangle((66, 46, 94, 51), fill=A1)
+    d.rectangle((68, 48, 92, 49), fill=HI)
+    return im
+
+
+def pic_capodimonte():
+    """The Reggia di Capodimonte: Pompeian red walls and grey piperno pilasters among the trees."""
+    im, d = canvas()
+    for x, y, r in ((0, 12, 20), (136, 10, 22), (60, 14, 16), (96, 16, 14)):
+        d.ellipse((x, y, x + 2 * r, y + r + 8), fill=N1)
+    d.rectangle((8, 24, 151, 63), fill=A2)
+    d.rectangle((6, 21, 153, 23), fill=WL)
+    for x in range(8, 152, 4):
+        d.point((x, 20), fill=HI)
+    d.rectangle((8, 56, 151, 63), fill=WD)
+    for bay, x in enumerate(range(8, 152, 16)):
+        d.rectangle((x, 24, x + 2, 63), fill=MET)
+        if x + 16 > 152:
+            break
+        d.rectangle((x + 6, 27, x + 12, 27), fill=WL)
+        d.rectangle((x + 7, 28, x + 11, 36), fill=WIN_L if bay in (2, 6) else WIN_D)
+        if bay in (3, 4, 5):
+            d.rectangle((x + 6, 46, x + 12, 63), fill=OUT_)
+            d.rectangle((x + 7, 44, x + 11, 45), fill=OUT_)
+        else:
+            d.rectangle((x + 6, 41, x + 12, 41), fill=WL)
+            d.rectangle((x + 7, 42, x + 11, 51), fill=WIN_D)
+    d.rectangle((149, 24, 151, 63), fill=MET)
+    for x, y in ((0, 44), (146, 46)):
+        d.ellipse((x, y, x + 13, y + 12), fill=N2)
+        d.rectangle((x + 6, y + 12, x + 7, 63), fill=A1)
+    return im
+
+
+def pic_villa():
+    """Villa Doria d'Angri at Posillipo, from the photograph in assets-src/.
+
+    The daytime sky is cut out so the storm shows behind the roof, the picture
+    is dimmed towards dusk and reduced to 12 flat colours.
+    """
+    photo = Image.open(SRC / "villa_doria_dangri.jpg").convert("RGB")
+    photo = photo.crop((44, 0, 500, 256)).resize((PIC_W, 80), Image.Resampling.LANCZOS)
+    a = np.asarray(photo, dtype=np.int16)
+    sky = (a[:, :, 2] > a[:, :, 0] + 24) & (a[:, :, 2] > a[:, :, 1] + 8) & (a[:, :, 2] > 110)
+    seen = np.zeros(sky.shape, dtype=bool)
+    stack = [(0, x) for x in range(PIC_W)]
+    while stack:                                                         # only the sky that reaches the top edge
+        y, x = stack.pop()
+        if y < 0 or x < 0 or y >= 80 or x >= PIC_W or seen[y, x] or not sky[y, x]:
+            continue
+        seen[y, x] = True
+        stack += [(y, x - 1), (y, x + 1), (y + 1, x), (y - 1, x)]
+    grey = a.mean(axis=2, keepdims=True)
+    graded = np.clip((grey + (a - grey) * 1.35) * np.array([0.86, 0.80, 0.82]), 0, 255).astype(np.uint8)
+    graded[seen] = graded[~seen].mean(axis=0).astype(np.uint8)
+    q = Image.fromarray(graded).quantize(colors=12, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE)
+    q = q.filter(ImageFilter.ModeFilter(3))
+    inds = np.asarray(q, dtype=np.uint8) + 1
+    inds[seen] = 0
+    for y in range(80):                                                  # drop one-pixel specks along each row
+        for x in range(1, PIC_W - 1):
+            if inds[y, x - 1] == inds[y, x + 1] != inds[y, x] and inds[y, x - 1]:
+                inds[y, x] = inds[y, x - 1]
+    pal = q.getpalette()[:36]
+    return inds, [tuple(pal[i * 3:i * 3 + 3]) for i in range(12)]
+
+
+def pic_plebiscito():
+    """Piazza del Plebiscito: the dome and portico of San Francesco di Paola and its colonnade."""
+    im, d = canvas()
+    d.ellipse((56, 4, 103, 52), fill=MET)                               # the great dome
+    d.arc((58, 6, 101, 50), 190, 260, fill=WL)
+    d.rectangle((77, 0, 82, 5), fill=WL)
+    d.rectangle((79, 0, 80, 1), fill=GLOW)
+    d.rectangle((58, 26, 101, 33), fill=WL)
+    for x in range(61, 100, 5):
+        d.rectangle((x, 28, x + 1, 31), fill=WIN_D)
+    for x in (36, 106):                                                 # side domes
+        d.ellipse((x, 24, x + 17, 42), fill=MET)
+        d.rectangle((x + 8, 21, x + 9, 24), fill=WL)
+    d.rectangle((0, 42, 159, 55), fill=WD)                              # the hemicycle
+    d.rectangle((0, 38, 159, 41), fill=WL)
+    for x in range(2, 158, 5):
+        d.rectangle((x, 42, x + 1, 55), fill=HI)
+    for x in range(4, 158, 10):
+        d.rectangle((x, 35, x, 37), fill=MET)
+    d.rectangle((58, 33, 101, 55), fill=WM)
+    d.polygon([(58, 33), (79, 24), (80, 24), (101, 33)], fill=HI)       # the portico
+    d.rectangle((58, 33, 101, 34), fill=WL)
+    d.rectangle((60, 35, 99, 55), fill=OUT_)
+    for x in range(61, 99, 7):
+        d.rectangle((x, 35, x + 2, 55), fill=HI)
+    d.rectangle((0, 56, 159, 58), fill=WL)
+    d.rectangle((0, 59, 159, 63), fill=GL)
+    for x in (30, 124):                                                 # the equestrian statues
+        d.rectangle((x, 52, x + 6, 63), fill=WM)
+        d.rectangle((x - 1, 47, x + 7, 51), fill=OUT_)
+        d.rectangle((x + 2, 43, x + 3, 47), fill=OUT_)
+    return im
+
+
+def pulcinella(frame):
+    """44x60, drawn 2x: white smock and sugar-loaf hat, black half mask with the hooked nose.
+    Colours: 1 white, 2 shadow, 3 black, 4 red. Frame 0 arms raised, frame 1 arms down."""
+    im = Image.new("P", (44, 60), 0)
     d = ImageDraw.Draw(im)
-    d.polygon([(0, 31), (14, 24), (30, 10), (36, 6), (42, 9), (47, 12), (52, 7), (58, 3), (64, 5), (78, 20), (95, 31)], fill=1)
-    d.polygon([(47, 12), (52, 7), (58, 3), (64, 5), (78, 20), (95, 31), (60, 31), (56, 16)], fill=2)
-    d.line([(58, 3), (60, 8), (58, 13), (61, 18)], fill=3)
-    d.point([(57, 2), (59, 1), (60, 3)], fill=3)
+    d.polygon([(15, 14), (29, 14), (30, 6), (36, 1), (33, 0), (24, 4)], fill=1)       # the hat, flopping
+    d.line([(27, 13), (29, 6), (34, 2)], fill=2)
+    d.ellipse((14, 11, 30, 27), fill=1)
+    d.rectangle((14, 15, 30, 20), fill=3)                                             # the mask
+    d.polygon([(21, 17), (29, 25), (22, 23)], fill=3)
+    d.rectangle((16, 16, 18, 17), fill=4)
+    d.rectangle((25, 16, 27, 17), fill=4)
+    d.line([(17, 24), (21, 25)], fill=4)
+    d.polygon([(9, 28), (35, 28), (39, 47), (5, 47)], fill=1)                         # the smock
+    for x in (14, 22, 30):
+        d.line([(x, 31), (x - 2 + (x - 22) // 4, 46)], fill=2)
+    d.rectangle((7, 41, 37, 42), fill=3)
+    if frame == 0:
+        d.polygon([(10, 28), (1, 12), (6, 10), (15, 27)], fill=1)
+        d.polygon([(34, 28), (43, 12), (38, 10), (29, 27)], fill=1)
+        d.rectangle((0, 8, 5, 11), fill=3)
+        d.rectangle((38, 8, 43, 11), fill=3)
+    else:
+        d.polygon([(10, 28), (0, 38), (4, 42), (14, 32)], fill=1)
+        d.polygon([(34, 28), (43, 38), (39, 42), (30, 32)], fill=1)
+        d.rectangle((0, 39, 4, 43), fill=3)
+        d.rectangle((39, 39, 43, 43), fill=3)
+    d.rectangle((10, 47, 20, 56), fill=1)                                             # baggy trousers
+    d.rectangle((24, 47, 34, 56), fill=1)
+    d.line([(15, 48), (15, 56)], fill=2)
+    d.line([(29, 48), (29, 56)], fill=2)
+    d.rectangle((7, 56, 20, 59), fill=3)
+    d.rectangle((24, 56, 37, 59), fill=3)
+    return np.asarray(im, dtype=np.uint8)
+
+
+def make_far():
+    """48x16, drawn 2x: the two-peaked Vesuvius seen across the bay. 1 dark, 2 light, 3 lava."""
+    im = Image.new("P", (48, 16), 0)
+    d = ImageDraw.Draw(im)
+    d.polygon([(0, 15), (7, 12), (15, 5), (18, 3), (21, 4), (23, 6), (26, 3), (29, 1), (32, 2), (39, 10), (47, 15)], fill=1)
+    d.polygon([(23, 6), (26, 3), (29, 1), (32, 2), (39, 10), (47, 15), (30, 15), (28, 8)], fill=2)
+    d.line([(29, 1), (30, 4), (29, 6)], fill=3)
+    d.point((28, 0), fill=3)
     return np.asarray(im, dtype=np.uint8)
 
 
@@ -983,31 +798,25 @@ GLYPHS = {
 
 
 def make_logo():
-    """'SPIRITI!' in 4x4 blocks, 1 bpp, 192x28; game.c draws it twice for a shadow."""
-    scale = 4
-    a = np.zeros((7 * scale, 8 * 6 * scale), dtype=np.uint8)
+    """'SPIRITI!' as a 47x7 picture drawn 4x; game.c draws it twice for a shadow."""
+    a = np.zeros((7, 47), dtype=np.uint8)
     for n, ch in enumerate("SPIRITI!"):
         for gy, row in enumerate(GLYPHS[ch]):
             for gx, bit in enumerate(row):
-                if bit == "1":
-                    px, py = (n * 6 + gx) * scale + 2, gy * scale
-                    a[py:py + scale, px:px + scale] = 1
+                a[gy, n * 6 + gx] = int(bit)
     return a
 
 
 MAP_CELL, MAP_W, MAP_H = 4, 80, 40
-
-
 COAST = [(0, 150), (30, 146), (56, 136), (76, 120), (96, 110), (130, 106), (170, 98), (210, 90), (236, 92),
          (256, 104), (276, 126), (296, 150), (319, 164)]
 
 
 def make_map():
-    """The Gulf of Naples as horizontal runs of 4x4 cells.
+    """The Gulf of Naples, 80x40 drawn 4x: 1 beach, 2 land, 3 hills.
 
     North is up: the city climbs from the bay, Capo Posillipo closes it to the
-    west and the Vesuvian coast to the east. Three nested masks (beach, land,
-    hills) each hold up to MAP_RUNS (start, end) cell pairs per row.
+    west and the Vesuvian coast to the east; Capri is on the horizon.
     """
     land = np.zeros((MAP_H, MAP_W), dtype=bool)
     for cx in range(MAP_W):
@@ -1018,7 +827,7 @@ def make_map():
                 t = t * t * (3 - 2 * t)
                 edge = y0 + (y1 - y0) * t + 3 * np.sin(cx * 0.55)
                 land[:max(0, int(edge) // MAP_CELL), cx] = True
-    for cy in range(MAP_H):                              # Capri on the horizon
+    for cy in range(MAP_H):
         for cx in range(MAP_W):
             if ((cx - 40) / 5.5) ** 2 + ((cy - 36.5) / 2.2) ** 2 < 1:
                 land[cy, cx] = True
@@ -1034,29 +843,64 @@ def make_map():
         return m
 
     grown = np.pad(land, 6, mode="edge")                 # the map's own edges are not a coast
-    layers = [land, erode(grown, 1)[6:-6, 6:-6], erode(grown, 5)[6:-6, 6:-6]]
-    flat = []
-    for mask in layers:
-        for y in range(MAP_H):
-            runs = []
-            x = 0
-            while x < MAP_W:
-                if mask[y, x]:
-                    x0 = x
-                    while x < MAP_W and mask[y, x]:
-                        x += 1
-                    runs.append((x0, x))
-                else:
-                    x += 1
-            assert len(runs) <= 3, (y, runs)
-            for i in range(3):
-                flat += list(runs[i]) if i < len(runs) else [0, 0]
-    return flat, layers
+    return (land.astype(np.uint8) + erode(grown, 1)[6:-6, 6:-6] + erode(grown, 5)[6:-6, 6:-6]).astype(np.uint8)
 
 
-# District markers on the 320x160 map, in playfield pixels.
-HAUNT_XY = [(184, 66), (112, 92), (124, 50), (232, 72), (48, 104), (176, 22)]
-VESUVIO_XY = (282, 44)
+# --------------------------------------------------------------------------
+# Scenes: a picture, three rows of ground tiles, a sky and 15 colours each
+# --------------------------------------------------------------------------
+GROUND_GREY = [(58, 56, 70), (104, 100, 112)]
+SCENES = [
+    dict(name="CENTRO", title="Centro Storico - Gesu Nuovo", pic=pic_centro, ground=".ko", spirits=("ghost0",),
+         pal=[(16, 14, 24), (66, 64, 78), (100, 98, 114), (206, 200, 190), (182, 118, 74), (112, 56, 44),
+              (26, 30, 54), (255, 214, 120), (255, 236, 150), (58, 56, 70), (104, 100, 112), (36, 96, 60),
+              (120, 190, 96), (132, 134, 150), (246, 238, 220)],
+         sky=((8, 10, 40), (62, 44, 96))),
+    dict(name="MERGELLINA", title="Mergellina - Castel dell'Ovo", pic=pic_mergellina, ground="=ko", spirits=("ghost1",),
+         pal=[(10, 12, 30), (52, 48, 98), (86, 74, 134), (214, 196, 160), (176, 140, 96), (255, 110, 50),
+              (24, 30, 64), (255, 208, 110), (255, 240, 180), (60, 58, 80), (112, 108, 128), (10, 58, 124),
+              (56, 122, 200), (150, 156, 176), (236, 240, 250)],
+         sky=((6, 10, 44), (40, 60, 130))),
+    dict(name="VOMERO", title="Vomero - Castel Sant'Elmo", pic=pic_vomero, ground=".ko", spirits=("ghost3",),
+         pal=[(14, 14, 24), (120, 96, 60), (176, 146, 96), (220, 196, 150), (214, 150, 80), (190, 84, 70),
+              (30, 30, 50), (255, 216, 120), (255, 240, 170), (56, 56, 68), (102, 100, 112), (24, 64, 46),
+              (56, 112, 64), (136, 140, 156), (240, 234, 220)],
+         sky=((8, 8, 38), (70, 50, 110))),
+    dict(name="PORTO", title="Porto - Maschio Angioino", pic=pic_porto, ground=".qo", spirits=("ghost2",),
+         pal=[(10, 10, 20), (58, 54, 62), (150, 126, 96), (196, 176, 140), (222, 120, 40), (186, 50, 54),
+              (20, 26, 50), (255, 220, 120), (255, 246, 200), (52, 56, 70), (98, 104, 120), (10, 36, 90),
+              (40, 100, 170), (150, 150, 160), (240, 240, 236)],
+         sky=((4, 8, 36), (30, 50, 110))),
+    dict(name="FUORIGROTTA", title="Fuorigrotta - lo stadio", pic=pic_fuorigrotta, ground=".ko", spirits=("ghost4",),
+         pal=[(12, 14, 28), (70, 80, 100), (116, 128, 150), (170, 184, 204), (40, 110, 190), (90, 170, 240),
+              (24, 28, 52), (255, 236, 150), (255, 252, 220), (54, 58, 66), (100, 106, 116), (30, 90, 60),
+              (110, 180, 100), (136, 146, 164), (240, 246, 255)],
+         sky=((6, 12, 44), (50, 70, 120))),
+    dict(name="CAPODIMONTE", title="Capodimonte - la Reggia", pic=pic_capodimonte, ground=".oo", spirits=("ghost5",),
+         pal=[(14, 12, 18), (70, 68, 76), (110, 106, 112), (214, 206, 190), (96, 66, 40), (168, 52, 44),
+              (30, 22, 30), (255, 200, 110), (255, 232, 160), (60, 54, 50), (104, 96, 86), (22, 58, 40),
+              (52, 104, 58), (140, 138, 144), (236, 228, 212)],
+         sky=((10, 10, 36), (56, 50, 100))),
+    dict(name="VILLA", title="Posillipo - Villa Doria d'Angri", pic=pic_villa, ground="...", spirits=("boss",),
+         pal=None, sky=((22, 6, 40), (70, 110, 60))),
+    dict(name="PLEBISCITO", title="Piazza del Plebiscito", pic=pic_plebiscito, ground=".ff", spirits=(),
+         pal=[(16, 12, 20), (60, 56, 66), (128, 122, 124), (196, 190, 182), (150, 60, 40), (200, 60, 30),
+              (30, 26, 44), (255, 200, 110), (255, 230, 150), (86, 82, 88), (140, 136, 138), (150, 24, 10),
+              (255, 110, 20), (110, 114, 128), (236, 232, 222)],
+         sky=((40, 6, 30), (170, 60, 24))),
+    dict(name="LUNGOMARE", title="Lungomare", pic=None, ground="...", spirits=("ghost0",),
+         pal=[(10, 12, 30), (60, 62, 96), (110, 114, 150), (170, 176, 204), (150, 96, 50), (214, 92, 70),
+              (24, 30, 64), (255, 208, 110), (255, 240, 180), (60, 58, 80), (112, 108, 128), (10, 58, 124),
+              (56, 122, 200), (150, 156, 176), (236, 240, 250)],
+         sky=((6, 10, 44), (40, 60, 130))),
+]
+FAR_RGB = [(44, 44, 96), (80, 70, 130), (255, 110, 50)]
+
+# Interface colour drawn as RGB565 (text backgrounds), so it needs a cell.
+UI_NAVY = rgb565((10, 16, 52))
+
+# District markers on the 320x160 map: six districts, the villa at Posillipo, the piazza.
+HAUNT_XY = [(184, 66), (112, 92), (124, 50), (232, 72), (48, 100), (176, 22), (76, 112), (158, 88)]
 FAR_ON_MAP = (224, 36)
 
 
@@ -1087,12 +931,18 @@ def main():
         placed, own = place(pal[1:], shared, {})
         palettes[symbol] = [0] + placed
         ghost_cells[symbol] = own
-    # ---- each district against the shared colours and its own spirits ----
-    scene_pals, far_pals, sky = [], [], []
+    # ---- each scene against the shared colours and its own spirits ----
+    scene_pals, sky, pictures = [], [], []
     for scene in SCENES:
+        picture = scene["pic"]() if scene["pic"] else None
+        if isinstance(picture, tuple):                   # the photograph brings its own colours
+            picture, colours = picture
+            scene["pal"] = colours + [(0, 0, 0)] * (15 - len(colours))
+        elif picture is not None:
+            picture = np.asarray(picture, dtype=np.uint8)
         taken = dict(shared)
         blocked = set()                                  # cells two of its spirits use differently
-        for g in scene["ghosts"]:
+        for g in scene["spirits"]:
             for k, v in ghost_cells[g].items():
                 if k in taken and taken[k] != v:
                     blocked.add(k)
@@ -1100,15 +950,16 @@ def main():
         for k in blocked:
             del taken[k]
         placed, own = place([rgb565(c) for c in scene["pal"]], taken, {}, blocked)
-        far, own = place([rgb565(c) for c in scene["far_pal"]], taken, own, blocked)
+        if scene["name"] == "LUNGOMARE":
+            far_pal, own = place([rgb565(c) for c in FAR_RGB], taken, own, blocked)
         scene_pals += [0] + placed
-        far_pals += [0] + far
         sky += [rgb565(scene["sky"][0]), rgb565(scene["sky"][1])]
         scene["placed"] = [0] + placed
+        scene["picture"] = picture
         for role, (want, got) in enumerate(zip(scene["pal"], placed), 1):
             if distance(rgb565(want), got) > 34:
                 print(f"note: {scene['name']} {ROLE_NAMES[role]} {want} became {rgb888(got)}")
-        scene["far_placed"] = [0] + far
+    far_pal = [0] + far_pal
 
     out.append(f"#define SN_UI_NAVY 0x{ui_navy:04X}")
     for symbol, _, size, _, _ in SPRITES:
@@ -1139,30 +990,32 @@ def main():
         assert len(rows) == SCENE_ROWS and all(len(r) == SCENE_COLS for r in rows), rows
         return [TILE_CODE[CHARS[ch]] if CHARS[ch] else 0 for r in rows for ch in r]
 
-    out.append(c_u8("sn_scene_maps", [v for s in SCENES for v in encode(s["rows"])]))
+    out.append(c_u8("sn_shore_map", encode(SHORE_ROWS)))
     out.append(c_u8("sn_road_map", encode(ROAD_ROWS)))
+    out.append(c_u8("sn_ground", [TILE_CODE[CHARS[ch]] if CHARS[ch] else 0 for s in SCENES for ch in s["ground"]]))
     out.append(c_u16("sn_scene_pal", scene_pals))
-    out.append(c_u16("sn_far_pal", far_pals))
+    out.append(c_u16("sn_far_pal", far_pal))
     out.append(c_u16("sn_sky_pal", sky))
 
+    out.append(f"#define SN_PIC_W {PIC_W}")
+    sizes = {}
+    for number, scene in enumerate(SCENES):
+        if scene["picture"] is not None:
+            data = encode_picture(scene["picture"])
+            sizes[scene["name"]] = len(data)
+            out.append(f"/* {scene['title']} */")
+            out.append(c_u8(f"sn_pic{number}", data, per=24))
     far = make_far()
-    out.append(f"#define SN_FAR_W {far.shape[1]}")
-    out.append(f"#define SN_FAR_H {far.shape[0]}")
-    out.append(c_u8("sn_far_pixels", pack(far, 2)))
     logo = make_logo()
-    out.append(f"#define SN_LOGO_W {logo.shape[1]}")
-    out.append(f"#define SN_LOGO_H {logo.shape[0]}")
-    out.append(c_u8("sn_logo_pixels", pack(logo, 1)))
-
-    map_runs, map_layers = make_map()
-    out.append(f"#define SN_MAP_CELL {MAP_CELL}")
-    out.append(f"#define SN_MAP_ROWS {MAP_H}")
-    out.append("#define SN_MAP_RUNS 3")
-    out.append("#define SN_MAP_LAYERS 3")
-    out.append(c_u8("sn_map_runs", map_runs, per=24))
+    gulf = make_map()
+    pulci = [pulcinella(0), pulcinella(1)]
+    for name, a in (("far", far), ("logo", logo), ("gulf", gulf), ("pulci0", pulci[0]), ("pulci1", pulci[1])):
+        data = encode_picture(a)
+        sizes[name] = len(data)
+        out.append(f"#define SN_{name.upper()}_W {a.shape[1]}")
+        out.append(f"#define SN_{name.upper()}_H {a.shape[0]}")
+        out.append(c_u8(f"sn_{name}_pic", data, per=24))
     out.append(c_u16("sn_haunt_xy", [v for xy in HAUNT_XY for v in xy]))
-    out.append(f"#define SN_VESUVIO_X {VESUVIO_XY[0]}")
-    out.append(f"#define SN_VESUVIO_Y {VESUVIO_XY[1]}")
     out.append(f"#define SN_MAP_FAR_X {FAR_ON_MAP[0]}")
     out.append(f"#define SN_MAP_FAR_Y {FAR_ON_MAP[1]}")
     out.append("#endif")
@@ -1178,99 +1031,76 @@ def main():
                     px[x, y] = rgb888(pal[t[y, x]]) + (255,)
         return im
 
-    def scene_image(scene, rows):
-        im = Image.new("RGBA", (320, 160), (0, 0, 0, 255))
-        d = ImageDraw.Draw(im)
-        top, low = scene["sky"]
-        for band in range(8):
-            c = tuple(top[i] + (low[i] - top[i]) * band // 7 for i in range(3))
-            d.rectangle((0, band * 20, 319, band * 20 + 19), fill=c)
-        if scene["far"]:
-            fp = scene["far_placed"]
-            for y in range(far.shape[0]):
-                for x in range(far.shape[1]):
-                    if far[y, x]:
-                        im.putpixel((196 + x, (3 if rows is ROAD_ROWS else 4) * 16 - 23 + y), rgb888(fp[far[y, x]]) + (255,))
-        for ty, row in enumerate(rows):
-            for tx, ch in enumerate(row):
-                if CHARS[ch]:
-                    tile = TILES[TILE_CODE[CHARS[ch]] - 1][1]
-                    im.alpha_composite(tile_image(tile, scene["placed"]), (tx * 16, ty * 16))
-        return im
-
-    def sprite_image(inds, pal):
+    def sprite_image(inds, pal, scale=1):
         h, w = inds.shape
         im = Image.new("RGBA", (w, h), (0, 0, 0, 0))
         for y in range(h):
             for x in range(w):
                 if inds[y, x]:
                     im.putpixel((x, y), rgb888(pal[inds[y, x]]) + (255,))
+        return im.resize((w * scale, h * scale), Image.Resampling.NEAREST) if scale > 1 else im
+
+    def scene_image(scene):
+        im = Image.new("RGBA", (320, 160), (0, 0, 0, 255))
+        d = ImageDraw.Draw(im)
+        top, low = scene["sky"]
+        for band in range(8):
+            c = tuple(top[i] + (low[i] - top[i]) * band // 7 for i in range(3))
+            d.rectangle((0, band * 20, 319, band * 20 + 19), fill=c)
+        if scene["picture"] is not None:
+            im.alpha_composite(sprite_image(scene["picture"], scene["placed"], 2), (0, 0))
+        rows = SHORE_ROWS if scene["name"] == "LUNGOMARE" else ["." * 20] * 7 + [ch * 20 for ch in scene["ground"]]
+        for ty, row in enumerate(rows):
+            for tx, ch in enumerate(row):
+                if ch == "=" and tx % 4 == 0:
+                    ch = "I"
+                if CHARS[ch]:
+                    im.alpha_composite(tile_image(TILES[TILE_CODE[CHARS[ch]] - 1][1], scene["placed"]), (tx * 16, ty * 16))
         return im
 
-    sheet = Image.new("RGBA", (640, 4 * 180), (4, 8, 20, 255))
+    pulci_pal = [0, 0xFFFF, rgb565((176, 186, 214)), rgb565((8, 8, 12)), 0xF800]
+    sheet = Image.new("RGBA", (640, 5 * 180), (4, 8, 20, 255))
     d = ImageDraw.Draw(sheet)
-    views = [(s, s["rows"]) for s in SCENES] + [(SCENES[1], ROAD_ROWS)]
-    for i, (scene, rows) in enumerate(views):
-        im = scene_image(scene, rows)
+    for i, scene in enumerate(SCENES):
+        im = scene_image(scene)
         x, y = (i % 2) * 320, (i // 2) * 180
-        ghost = scene["ghosts"][-1]
-        if rows is ROAD_ROWS:
-            im.alpha_composite(sprite_image(sprites["fiat"][0], palettes["fiat"]), (60, 104))
-            im.alpha_composite(sprite_image(props["slime"], props_pal), (220, 140))
-            im.alpha_composite(sprite_image(props["palm"], props_pal), (150, 40))
-        else:
-            im.alpha_composite(sprite_image(sprites[ghost][0], palettes[ghost]), (200 if ghost != "boss" else 112, 30))
-            im.alpha_composite(sprite_image(sprites["hunter"][0], palettes["hunter"]), (30, 88))
-            im.alpha_composite(sprite_image(props["trap"], props_pal), (180, 134))
-            im.alpha_composite(sprite_image(props["lamp"], props_pal), (4, 96))
+        if scene["name"] == "PLEBISCITO":
+            im.alpha_composite(sprite_image(pulci[0], pulci_pal, 2), (116, 8))
+            im.alpha_composite(sprite_image(sprites["fiat"][0], palettes["fiat"]), (40, 118))
+            im.alpha_composite(sprite_image(props["rooftrap"], props_pal), (58, 110))
+        elif scene["spirits"]:
+            ghost = scene["spirits"][-1]
+            im.alpha_composite(sprite_image(sprites[ghost][0], palettes[ghost]), (200 if ghost != "boss" else 112, 24))
+            im.alpha_composite(sprite_image(sprites["hunter"][0], palettes["hunter"]), (30, 102))
+            im.alpha_composite(sprite_image(props["trap"], props_pal), (180, 132))
         sheet.alpha_composite(im, (x, y))
-        d.text((x + 4, y + 164), scene["name"] if rows is not ROAD_ROWS else "LUNGOMARE (drive)", fill=(255, 255, 255))
+        d.text((x + 4, y + 164), f"{scene['title']}  ({sizes.get(scene['name'], 0)} bytes)", fill=(255, 255, 255))
+    sheet.alpha_composite(sprite_image(gulf, [0, rgb565((226, 196, 130)), rgb565((46, 120, 66)), rgb565((70, 150, 80))], 4), (320, 720))
     sheet.convert("RGB").save(DOCS / "scenes.png", optimize=True)
 
-    bank = Image.new("RGBA", (10 * 36 + 4, ((len(TILES) + 9) // 10) * 36 + 4), (30, 30, 46, 255))
-    for i, (name, t) in enumerate(TILES):
-        bank.alpha_composite(tile_image(t, SCENES[0]["placed"]).resize((32, 32), Image.Resampling.NEAREST),
-                             (4 + (i % 10) * 36, 4 + (i // 10) * 36))
-    bank.convert("RGB").save(DOCS / "tiles.png", optimize=True)
-
-    art = Image.new("RGBA", (640, 200), (16, 20, 34, 255))
+    art = Image.new("RGBA", (640, 260), (16, 20, 34, 255))
     x = 6
     for symbol, _, size, _, _ in SPRITES:
-        im = sprite_image(sprites[symbol][0], palettes[symbol]).resize((size[0] * 2, size[1] * 2), Image.Resampling.NEAREST)
+        im = sprite_image(sprites[symbol][0], palettes[symbol], 2)
         if x + im.width > 636:
             break
         art.alpha_composite(im, (x, 8))
         x += im.width + 6
     x = 6
     for name, inds in props.items():
-        im = sprite_image(inds, props_pal).resize((inds.shape[1] * 2, inds.shape[0] * 2), Image.Resampling.NEAREST)
-        art.alpha_composite(im, (x, 200 - im.height - 4))
+        im = sprite_image(inds, props_pal, 2)
+        art.alpha_composite(im, (x, 260 - im.height - 4))
         x += im.width + 8
-    art.alpha_composite(sprite_image(logo, [0, 0xFFE0]), (300, 164))
+    art.alpha_composite(sprite_image(pulci[0], pulci_pal, 2), (430, 134))
+    art.alpha_composite(sprite_image(pulci[1], pulci_pal, 2), (530, 134))
     art.convert("RGB").save(DOCS / "sprites.png", optimize=True)
+    for stale in ("tiles.png", "map.png"):
+        (DOCS / stale).unlink(missing_ok=True)
 
-    mp = Image.new("RGB", (320, 160), (14, 44, 110))
-    md = ImageDraw.Draw(mp)
-    for layer, colour in enumerate(((226, 196, 130), (46, 120, 66), (70, 150, 80))):
-        for row in range(MAP_H):
-            for i in range(3):
-                x0, x1 = map_runs[(layer * MAP_H + row) * 6 + i * 2:(layer * MAP_H + row) * 6 + i * 2 + 2]
-                if x1 > x0:
-                    md.rectangle((x0 * 4, row * 4, x1 * 4 - 1, row * 4 + 3), fill=colour)
-    fp = SCENES[1]["far_placed"]
-    for y in range(far.shape[0]):
-        for x in range(far.shape[1]):
-            if far[y, x]:
-                mp.putpixel((FAR_ON_MAP[0] + x, FAR_ON_MAP[1] + y), rgb888(fp[far[y, x]]))
-    for (hx, hy) in HAUNT_XY:
-        md.ellipse((hx - 4, hy - 4, hx + 4, hy + 4), fill=(255, 255, 255))
-    md.ellipse((VESUVIO_XY[0] - 4, VESUVIO_XY[1] - 4, VESUVIO_XY[0] + 4, VESUVIO_XY[1] + 4), fill=(255, 80, 40))
-    mp.save(DOCS / "map.png", optimize=True)
-
-    cells = len(shared)
     art_bytes = (len(TILES) * 128 + sum(s[0] * s[1] // 2 for _, _, s, _, _ in SPRITES)
-                 + sum(v.size // 2 for v in props.values()) + far.size // 4 + logo.size // 8 + len(map_runs))
-    print(f"{OUT.name}: {len(TILES)} tiles, {len(SCENES)} districts, {cells} shared cells, {art_bytes} bytes of art")
+                 + sum(v.size // 2 for v in props.values()) + sum(sizes.values()))
+    print("pictures:", ", ".join(f"{k} {v}" for k, v in sizes.items()))
+    print(f"{OUT.name}: {len(TILES)} tiles, {len(SCENES)} scenes, {len(shared)} shared cells, {art_bytes} bytes of art")
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@
 
 The release bundle is checked in:
 
-- `dist/spiriti-napoli97-2.0.0-store.zip` — manifest, icon, screenshot and both cartridges
+- `dist/spiriti-napoli97-3.0.0-store.zip` — manifest, icon, screenshot and both cartridges
 - `dist/store/` — the same files, unpacked
 - `dist/SHA256SUMS`
 
@@ -22,7 +22,7 @@ With the Store endpoint and a developer token configured in the PRG32 environmen
 
 ```sh
 cd "$PRG32_REPO"
-python3 -m prg32 store publish-bundle /path/to/spiriti-napoli97/dist/spiriti-napoli97-2.0.0-store.zip
+python3 -m prg32 store publish-bundle /path/to/spiriti-napoli97/dist/spiriti-napoli97-3.0.0-store.zip
 ```
 
 The submission enters the Store's review queue. The physical ESP32-C6 run in [STORE_CHECKLIST.md](STORE_CHECKLIST.md) is still open. Do not claim Ghostbusters affiliation; the colophon and metadata carry the tribute notice.
